@@ -76,6 +76,38 @@ pnpm demo:seed                  # loads fixtures + seeded breaking change
 
 `DEMO_MODE=1` serves cached HTML from `agent/fixtures/` instead of hitting Bright Data.
 
+### Seeing it work without the harness
+
+The detection half runs standalone, no accounts required:
+
+```bash
+pnpm demo:seed                                            # cold start
+DEMO_MODE=1 DEMO_FIXTURE=breaking   pnpm check            # finds the breaking change
+DEMO_MODE=1 DEMO_FIXTURE=restructured pnpm check          # vendor redesigned the page
+```
+
+The first prints the seeded breaking change, which symbols matched, and which of our files it
+affects. The second prints nothing extracted — and a repaired extraction spec, derived from the
+cached HTML and validated before it is proposed.
+
+```
+stripe — 5 entries (fixture), 1 new
+  ⚠ BREAKING · 2026-08-28 · The `source` parameter on the Charges API is deprecated
+      matched `source`, `/v1/charges`, `Charges API` → demo-app/src
+```
+
+### Status
+
+| Step | State |
+| --- | --- |
+| D1 detect | ✅ working, 39 tests |
+| D2 patch in a sandbox | ⏳ needs Daytona configured |
+| D3 PR via GitHub MCP | ⏳ PR body built and tested; needs the MCP connector |
+| D4 approval gate | ✅ gate implemented and tested · ⏳ needs harness wiring |
+| D5 session persistence | ⏳ harness |
+| D6 approve → merge | ⏳ harness |
+| D7 self-repair | ✅ detection + repair working · ⏳ PR for the spec change |
+
 ## Demo
 
 The 3-minute script lives in [`docs/DEMO.md`](docs/DEMO.md). The acceptance criteria it has to

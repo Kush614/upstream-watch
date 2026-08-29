@@ -32,11 +32,24 @@ function renderEvent(event: ChangeEvent): string[] {
 }
 
 async function main(): Promise<number> {
-  const report = await run();
+  const json = process.argv.includes("--json");
+
+  // Without this, inspecting a run consumes it: entries get marked seen, and the next
+  // run reports nothing. Rehearsing the demo is exactly when you inspect twice.
+  const persist = !process.argv.includes("--no-persist");
+
+  const report = await run({ persist });
+
+  // The agent consumes --json; a human reads the rendered form. Same run() either way.
+  if (json) {
+    console.log(JSON.stringify(report, null, 2));
+    return 0;
+  }
 
   const lines: string[] = [
     ``,
-    `upstream-watch · ${isDemoMode() ? "DEMO_MODE=1 (cached fixtures)" : "live"}`,
+    `upstream-watch · ${isDemoMode() ? "DEMO_MODE=1 (cached fixtures)" : "live"}` +
+      (persist ? "" : " · --no-persist"),
     ``,
   ];
 
