@@ -10,7 +10,9 @@
 #
 # Reads from .env (never printed):
 #   OPENAI_API_KEY / ANTHROPIC_API_KEY   step 2 — model provider
-#   DAYTONA_API_KEY                      step 5 — sandbox
+#   DAYTONA_API_KEY                      step 5 — sandbox. Create at
+#                                        https://app.daytona.io/dashboard/keys with the
+#                                        write:sandboxes and delete:sandboxes scopes.
 # GitHub (step 3) uses `gh auth token`; the connector is header-PAT, not OAuth.
 
 set -euo pipefail
@@ -118,9 +120,11 @@ fi
 if api /settings/sandbox-providers | grep -q '"type"'; then
   skip "step 5: sandbox provider already configured"
 elif [ -n "${DAYTONA_API_KEY:-}" ]; then
+  # Shape is SandboxProviderManifest: the key lives under auth, not at the top level.
   python3 -c "
 import json, os
-print(json.dumps({'data': [{'type': 'daytona', 'api_key': os.environ['DAYTONA_API_KEY']}]}))" > /tmp/uw-sb.json
+print(json.dumps({'manifest': {'type': 'daytona',
+                               'auth': {'api_key': os.environ['DAYTONA_API_KEY']}}}))" > /tmp/uw-sb.json
   if [ "$(code /settings/sandbox-providers -X PUT -H 'content-type: application/json' --data-binary @/tmp/uw-sb.json)" = "200" ]; then
     ok "step 5: Daytona sandbox configured"
   else
