@@ -69,8 +69,10 @@ describe("per-vendor source", () => {
       .toBeInstanceOf(CachedScraperClient);
   });
 
-  it("selects the live client otherwise", () => {
-    expect(createScraperClient({}, {} as NodeJS.ProcessEnv)).toBeInstanceOf(BrightDataScraperClient);
+  it("selects the live client when credentials are present", () => {
+    const env = { BRIGHTDATA_API_KEY: "k", BRIGHTDATA_ZONE: "z" } as unknown as NodeJS.ProcessEnv;
+
+    expect(createScraperClient({}, env)).toBeInstanceOf(BrightDataScraperClient);
   });
 
   it("DEMO_MODE=1 forces cache for every vendor", () => {
@@ -102,5 +104,32 @@ describe("both vendors are configured", () => {
     expect(run.firstRun).toBe(true);
     expect(run.events).toHaveLength(0);
     expect(run.valid).toBeGreaterThan(10);
+  });
+});
+
+describe("live credentials", () => {
+  it("falls back to the committed capture when Bright Data credentials are absent", async () => {
+    const { createScraperClient, CachedScraperClient, hasLiveCredentials } =
+      await import("../src/clients/index.ts");
+
+    // The agent's sandbox clones this repo from GitHub and .env is gitignored, so the
+    // credentials are simply not there. Without this the watcher either improvises a
+    // DEMO_MODE retry or declares the vendor broken — and which one varies per run.
+    expect(hasLiveCredentials({} as NodeJS.ProcessEnv)).toBe(false);
+    expect(createScraperClient({}, {} as NodeJS.ProcessEnv)).toBeInstanceOf(CachedScraperClient);
+  });
+
+  it("goes live when both credentials are present", async () => {
+    const { createScraperClient, BrightDataScraperClient } = await import("../src/clients/index.ts");
+    const env = { BRIGHTDATA_API_KEY: "k", BRIGHTDATA_ZONE: "z" } as unknown as NodeJS.ProcessEnv;
+
+    expect(createScraperClient({}, env)).toBeInstanceOf(BrightDataScraperClient);
+  });
+
+  it("needs both, not either", async () => {
+    const { hasLiveCredentials } = await import("../src/clients/index.ts");
+
+    expect(hasLiveCredentials({ BRIGHTDATA_API_KEY: "k" } as unknown as NodeJS.ProcessEnv)).toBe(false);
+    expect(hasLiveCredentials({ BRIGHTDATA_ZONE: "z" } as unknown as NodeJS.ProcessEnv)).toBe(false);
   });
 });

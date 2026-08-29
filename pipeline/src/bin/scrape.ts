@@ -14,7 +14,7 @@
 import { appendNote } from "../lib/notes.ts";
 import { loadTargets } from "../lib/targets.ts";
 import { scrapeAll, type VendorRun } from "../scrape.ts";
-import { isDemoMode } from "../clients/index.ts";
+import { hasLiveCredentials, isDemoMode } from "../clients/index.ts";
 import { UpstreamWatchError } from "../errors.ts";
 import type { ChangeEvent } from "../types.ts";
 
@@ -24,7 +24,13 @@ function flag(name: string): string | undefined {
 }
 
 function render(runs: VendorRun[]): string {
-  const lines = [``, `upstream-watch · ${isDemoMode() ? "DEMO_MODE=1 (cached)" : "live via Bright Data"}`, ``];
+  const mode = isDemoMode()
+    ? "DEMO_MODE=1 (cached)"
+    : hasLiveCredentials()
+      ? "live via Bright Data"
+      : "cached — no BRIGHTDATA_API_KEY/ZONE in this environment";
+
+  const lines = [``, `upstream-watch · ${mode}`, ``];
 
   for (const run of runs) {
     lines.push(
