@@ -8,3 +8,4 @@ coverage/
 .vite/
 .trueforge/
 .upstream-watch/
+agent/fixtures/html/*-scrape-*.html

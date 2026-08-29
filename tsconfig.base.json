@@ -6,10 +6,21 @@
     "lib": ["ES2022", "DOM"],
     "strict": true,
     "noUncheckedIndexedAccess": true,
+    "noUnusedLocals": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "resolveJsonModule": true,
-    "declaration": true,
-    "sourceMap": true
+    "sourceMap": true,
+
+    // We never compile with tsc: Node strips types at runtime (--experimental-strip-types)
+    // and vitest transforms for tests. tsc is a checker only, so imports keep their .ts
+    // extensions exactly as Node requires them.
+    "allowImportingTsExtensions": true,
+    // Node strips types without transforming them, so anything that needs codegen
+    // (parameter properties, enums, namespaces) fails only at runtime. This makes tsc
+    // reject it at check time instead - see NOTES.md 2026-08-29.
+    "erasableSyntaxOnly": true,
+    "noEmit": true,
+    "verbatimModuleSyntax": true
   }
 }
