@@ -1,0 +1,19 @@
+{
+  "name": "upstream-watch",
+  "private": true,
+  "version": "0.1.0",
+  "description": "An agent that watches the third-party APIs your code depends on, patches your code when they change, and asks before it merges.",
+  "engines": {
+    "node": ">=22"
+  },
+  "packageManager": "pnpm@10.13.0",
+  "scripts": {
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck",
+    "demo:seed": "pnpm --filter pipeline demo:seed"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}

@@ -1,0 +1,4 @@
+packages:
+  - pipeline
+  - ui
+  - demo-app

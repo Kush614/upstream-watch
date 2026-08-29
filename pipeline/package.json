@@ -1,0 +1,19 @@
+{
+  "name": "pipeline",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Scraper runner, change detection, and self-repair.",
+  "scripts": {
+    "dev": "node --experimental-strip-types src/index.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "demo:seed": "node --experimental-strip-types src/seed.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}

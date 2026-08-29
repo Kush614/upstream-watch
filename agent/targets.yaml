@@ -1,0 +1,22 @@
+# Which vendor pages we watch, and which of our code each one can break.
+# Referenced by CLAUDE.md §6 (targets_file) and specs/scraper-pipeline.md §5.
+#
+# A changelog entry is acted on only when it is BOTH breaking AND matches a watched
+# path below. Breaking-but-irrelevant entries are recorded and ignored.
+
+version: 1
+
+targets:
+  - vendor: stripe
+    name: Stripe API changelog
+    url: https://docs.stripe.com/changelog          # VERIFY exact URL when scraping tonight
+    # Demo mode reads these instead of hitting Bright Data (CLAUDE.md §5).
+    fixture: agent/fixtures/html/stripe-changelog.html
+    fixture_breaking: agent/fixtures/html/stripe-changelog-breaking.html
+    watches:
+      - path: demo-app/src/**
+        # Symbols we call that this vendor could deprecate. Populated in H1 once
+        # demo-app exists — keep it narrow so relevance matching stays honest.
+        symbols: []                                  # TODO(H1)
+
+  # Additional vendors are cut #5 in docs/PLAN.md §6. Do not add any until D1–D7 are green.

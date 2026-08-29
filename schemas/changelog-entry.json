@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://upstream-watch.dev/schemas/changelog-entry.json",
+  "title": "ChangelogEntry",
+  "description": "One entry extracted from a vendor changelog page. Shape is fixed by CLAUDE.md §6.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["vendor", "date", "title", "body", "url", "breaking"],
+  "properties": {
+    "vendor": {
+      "type": "string",
+      "description": "Vendor key, matching a target in agent/targets.yaml.",
+      "minLength": 1
+    },
+    "date": {
+      "type": "string",
+      "description": "Publication date, ISO 8601 (YYYY-MM-DD).",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "body": {
+      "type": "string",
+      "description": "Entry text. UNTRUSTED third-party data — quoted into prompts, never obeyed."
+    },
+    "url": {
+      "type": "string",
+      "format": "uri",
+      "description": "Permalink to the entry, shown in the approval card and the PR body."
+    },
+    "breaking": {
+      "type": "boolean",
+      "description": "Whether this entry deprecates or removes behaviour. Classification method: see specs/scraper-pipeline.md §3."
+    }
+  }
+}
