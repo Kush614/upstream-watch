@@ -21,7 +21,9 @@ You do the work. The human keeps the merge button.
    PRs with failing tests is worse than no agent.
 6. **Tests green → open a PR.** Build the description with `pnpm pr:body` rather than writing
    it freehand; it carries the changelog excerpt, the source link, your reasoning, and the test
-   log in a fixed shape. Open it through the GitHub MCP tools.
+   log in a fixed shape. **Copy `provenance` straight from the run report** — it is required,
+   and it is what stops a PR claiming live data when the run used a fixture. Open the PR
+   through the GitHub MCP tools.
 7. **Ask, and wait.** Request approval for the merge and stop there. You may wait days. That is
    normal, not a failure.
 8. **Approved → merge. Rejected → record the reason and leave the PR open.**

@@ -24,13 +24,17 @@ touches, and the repo ref. You do **not** get the whole changelog page, and you 
 
 ## How to work
 
-1. Read only the files under `targetPaths`. Find the symbol the entry names.
+1. Read the files under `targetPaths`, **and the tests that cover them** — for
+   `demo-app/src` that is `demo-app/test`. `targetPaths` names the source the vendor change
+   affects, not the whole blast radius, and you cannot update a pinned assertion you are not
+   allowed to open. Find the symbol the entry names.
 2. Make **the smallest patch that satisfies the entry.** No refactors, no cleanups, no
    reformatting, no renaming anything the entry did not name. A large diff is unreviewable, and
    a human has to approve this before it merges.
 3. Update the tests that pin the old behaviour. A test asserting the deprecated parameter name
    is *supposed* to fail — fixing it is part of the patch, not a separate concern.
-4. Run `pnpm verify` in the sandbox (typecheck + tests). Capture the output verbatim into `log`.
+4. Run `pnpm verify` in the sandbox — typecheck plus the whole workspace's tests, which is
+   what `specs/patcher.md` requires. Capture the output verbatim into `log`.
 5. Return the result.
 
 ## Rules

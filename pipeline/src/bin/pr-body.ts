@@ -13,10 +13,17 @@
 import { buildPr, type PatchResult } from "../lib/pr.ts";
 import type { ChangeEvent, Provenance } from "../types.ts";
 
+const VALID_PROVENANCE: Provenance[] = ["live", "cache", "fixture"];
+
 interface Input {
   event: ChangeEvent;
   patch: PatchResult;
-  provenance?: Provenance;
+  /**
+   * Required, deliberately. Defaulting a missing value to "fixture" would let a live run
+   * publish a PR that says it used cached data - a quiet lie about provenance, which is
+   * the one thing the agent is told never to get wrong.
+   */
+  provenance: Provenance;
 }
 
 async function readStdin(): Promise<string> {
@@ -29,10 +36,16 @@ async function main(): Promise<void> {
   const raw = (await readStdin()).trim();
   if (!raw) throw new Error("no input on stdin");
 
-  const { event, patch, provenance = "fixture" } = JSON.parse(raw) as Input;
+  const { event, patch, provenance } = JSON.parse(raw) as Input;
 
-  if (event.kind !== "breaking-change") {
-    throw new Error(`pr:body expects a breaking-change event, got "${event.kind}"`);
+  if (event?.kind !== "breaking-change") {
+    throw new Error(`pr:body expects a breaking-change event, got "${event?.kind}"`);
+  }
+  if (!VALID_PROVENANCE.includes(provenance)) {
+    throw new Error(
+      `pr:body requires "provenance" to be one of ${VALID_PROVENANCE.join(" | ")}. ` +
+        `It is copied from the run report and must not be guessed.`,
+    );
   }
 
   console.log(
