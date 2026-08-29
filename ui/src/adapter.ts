@@ -230,9 +230,22 @@ function toApprovals(events: ServerEvent[]): PendingApproval[] {
         .map(asMcpCall)
         .findLast((c): c is McpCall => c?.tool === "create_pull_request");
 
-      const body = String(prCall?.input.body ?? "");
-      const parsed = readPrBody(body);
+      const parsed = readPrBody(String(prCall?.input.body ?? ""));
       const patch = patches.at(-1);
+
+      // The gated call is usually merge_pull_request, and its own input names the PR. That
+      // matters when the merge is requested in a session that did not open the PR — the
+      // common case for a watch someone comes back to days later. Without this the card
+      // would show no PR link at all, which is the one thing a reviewer needs.
+      const gated = mcp?.input ?? {};
+      const number = Number(gated.pullNumber ?? gated.pull_number ?? 0);
+      const owner = String(gated.owner ?? prCall?.input.owner ?? "");
+      const repo = String(gated.repo ?? prCall?.input.repo ?? "");
+      const prUrl = owner && repo
+        ? number
+          ? `https://github.com/${owner}/${repo}/pull/${number}`
+          : `https://github.com/${owner}/${repo}/pulls`
+        : "";
 
       pending.push({
         id: `${event.thread_id ?? "main"}::${ref.id}`,
@@ -252,8 +265,8 @@ function toApprovals(events: ServerEvent[]): PendingApproval[] {
         testsPassed: patch ? patch.passed : testResultFrom(parsed.testOutput),
         testOutput: parsed.testOutput,
         provenance: parsed.provenance,
-        prUrl: prCall ? `https://github.com/${prCall.input.owner}/${prCall.input.repo}/pulls` : "",
-        prNumber: 0,
+        prUrl,
+        prNumber: number,
         prTitle: String(prCall?.input.title ?? ""),
         prBranch: String(prCall?.input.head ?? ""),
       });

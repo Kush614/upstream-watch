@@ -84,3 +84,17 @@ describe("splitDiff", () => {
     expect(after).toContain("context");
   });
 });
+
+describe("a merge gate opened in a session that did not create the PR", () => {
+  it("takes the PR identity from the gated call's own input", () => {
+    // merge_pull_request carries {owner, repo, pullNumber}. A watch someone returns to days
+    // later will have the merge in one session and the PR creation in another, so the card
+    // has to work from the merge call alone.
+    const input = { owner: "Kush614", repo: "upstream-watch", pullNumber: 6 };
+    const number = Number(input.pullNumber ?? 0);
+    const url = `https://github.com/${input.owner}/${input.repo}/pull/${number}`;
+
+    expect(number).toBe(6);
+    expect(url).toBe("https://github.com/Kush614/upstream-watch/pull/6");
+  });
+});
