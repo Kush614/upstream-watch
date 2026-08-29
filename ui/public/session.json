@@ -1,7 +1,7 @@
 {
   "source": "local",
   "connected": false,
-  "capturedAt": "2026-08-29T22:48:43.742Z",
+  "capturedAt": "2026-08-29T22:54:42.824Z",
   "capturedFrom": "01m17sa9bk6f5z9mn60cms38h6",
   "sessionTitle": "Merge pull request #6 in Kush614/upstream-watch. D",
   "vendors": [
@@ -450,7 +450,7 @@
   ],
   "summary": {
     "lastCheck": "2026-08-29T22:12:58.849Z",
-    "eventsSeen": 13,
+    "eventsSeen": 113,
     "prsOpened": 2,
     "prsMerged": 0,
     "pendingApprovals": 1

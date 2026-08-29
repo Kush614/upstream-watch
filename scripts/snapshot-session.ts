@@ -18,42 +18,42 @@ import { writeFile } from "node:fs/promises";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { toApprovals, toDone, toSteps, toVendors, unwrapEvents } from "../ui/src/adapter.ts";
+import { TrueForgeHttpClient } from "../pipeline/src/clients/trueforge.ts";
+import { NoSnapshotDataError, UpstreamWatchError } from "../pipeline/src/errors.ts";
+import { appendNote } from "../pipeline/src/lib/notes.ts";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const BASE = (process.env.TRUEFORGE_URL ?? "http://[::1]:8790").replace("localhost", "[::1]");
+
+// Transport and endpoints live in a client, not in a script (CLAUDE.md §7).
+const trueforge = new TrueForgeHttpClient();
 
 function flag(name: string): string | undefined {
   const i = process.argv.indexOf(`--${name}`);
   return i === -1 ? undefined : process.argv[i + 1];
 }
 
-async function api<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE}/api/v1${path}`);
-  if (!res.ok) throw new Error(`${path} -> ${res.status} ${res.statusText}`);
-  return (await res.json()) as T;
-}
-
 async function eventsFor(id: string) {
-  return unwrapEvents(await api(`/sessions/${id}/events`));
+  return unwrapEvents(await trueforge.sessionEvents(id));
 }
 
 async function main(): Promise<void> {
-  const { data: sessions } = await api<{ data: Array<{ id: string; title: string | null; created_at: string }> }>("/sessions");
-  const ordered = [...sessions].sort((a, b) => b.created_at.localeCompare(a.created_at));
+  const ordered = await trueforge.listSessions();
 
-  // Prefer a session that actually stopped at the gate: the approval card is the thing the
-  // offline demo most needs to show.
+  // Prefer a session that actually stopped at the gate — the approval card is the thing the
+  // offline demo most needs. Ask toApprovals, not the raw event type: a generic
+  // response_required, or an approval already answered, is not a pending gate, and choosing
+  // on the type alone produced snapshots with no card at all.
   let chosen = flag("session");
   if (!chosen) {
     for (const s of ordered.slice(0, 12)) {
-      if ((await eventsFor(s.id)).some((e) => e.type === "tool.approval_required" || e.type === "tool.response_required")) {
+      if (toApprovals(await eventsFor(s.id)).length > 0) {
         chosen = s.id;
         break;
       }
     }
   }
   chosen ??= ordered[0]?.id;
-  if (!chosen) throw new Error("no sessions to snapshot");
+  if (!chosen) throw new NoSnapshotDataError("No sessions to snapshot. Run the agent once first.");
 
   const events = await eventsFor(chosen);
   const extra = flag("merge") ? await eventsFor(flag("merge")!) : [];
@@ -90,7 +90,9 @@ async function main(): Promise<void> {
     done,
     summary: {
       lastCheck: steps.at(-1)?.at ?? null,
-      eventsSeen: events.length,
+      // Every panel is built from both sessions, so the count must be too — reporting only
+      // the chosen session understated it whenever --merge contributed.
+      eventsSeen: events.length + extra.length,
       prsOpened: done.length,
       prsMerged: done.filter((d) => d.status === "merged").length,
       pendingApprovals: pending.length,
@@ -115,7 +117,16 @@ async function main(): Promise<void> {
   );
 }
 
-main().catch((error: unknown) => {
-  console.error(`demo:snapshot failed: ${error instanceof Error ? error.message : String(error)}`);
+main().catch(async (error: unknown) => {
+  const message = error instanceof Error ? error.message : String(error);
+  console.error(`demo:snapshot failed: ${message}`);
+
+  // Top-level handlers log to NOTES.md in demo/dev (CLAUDE.md §7, §2.5).
+  await appendNote({
+    summary: `demo:snapshot failed: ${message.slice(0, 60)}`,
+    where: "scripts/snapshot-session.ts",
+    symptom: message,
+    cause: error instanceof UpstreamWatchError ? JSON.stringify(error.context) : undefined,
+  });
   process.exit(1);
 });

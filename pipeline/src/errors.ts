@@ -23,3 +23,9 @@ export class ConfigError extends UpstreamWatchError {}
 
 /** An irreversible action was attempted without `{ approved: true }` (CLAUDE.md §7). */
 export class ApprovalRequiredError extends UpstreamWatchError {}
+
+/** The TrueForge harness could not be reached, or answered with an error. */
+export class TrueForgeError extends UpstreamWatchError {}
+
+/** The harness answered, but had nothing usable to snapshot. */
+export class NoSnapshotDataError extends UpstreamWatchError {}

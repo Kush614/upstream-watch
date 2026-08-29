@@ -396,3 +396,27 @@ separator: the model would receive an empty prompt and answer anyway.
 deployment artifact, and every artifact can be absent. The rule that prompts live in `.md`
 files is a good one; it just quietly adds a failure path each time it is applied, and those are
 worth handling where they occur rather than at the top of a request.
+
+## 2026-08-30 — The snapshot command documented its own failure
+
+**Where:** `scripts/snapshot-session.ts`, `pipeline/src/clients/trueforge.ts`
+**Symptom:** Running `pnpm demo:snapshot` with TrueForge stopped:
+
+```
+demo:snapshot failed: Could not reach TrueForge at http://[::1]:8790.
+Is it running? (npx @truefoundry/trueforge)
+```
+
+and an entry appeared in this file on its own, naming the component, the symptom and the
+cause (`{"path":"/sessions","cause":"TypeError: fetch failed"}`).
+**Cause:** Deliberate — I had killed the harness to prove the UI renders offline, then ran the
+snapshot command against it.
+**Fix:** None needed; this is the behaviour working. `TrueForgeHttpClient` throws a typed
+`TrueForgeError` naming the address and how to start the server, and the top-level handler
+appends to `NOTES.md` as `CLAUDE.md` §7 requires.
+**Lesson:** Qodo asked for two things here that felt like bureaucracy — route the call through
+a client, and log the failure path — and the payoff showed up within a minute of implementing
+them. The error told me exactly what was wrong and where, and wrote itself down without being
+asked. Failure documentation is cheap to add while writing the failure and expensive to
+reconstruct afterwards.
+
