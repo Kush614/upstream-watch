@@ -1,36 +1,19 @@
-# PITCH — 90 seconds
+# Pitch — 90 seconds
 
-> Status: **skeleton**. Finalise after the demo works, not before.
+**Problem (15s).** Dependabot tells you when a package version changes. Nobody tells you when the API *behind* it changes — a deprecation note in a changelog nobody reads. That's how a working integration breaks at 2 AM with no diff in your lockfile.
 
-## The one-liner
+**What it does (15s).** Upstream Watch watches those pages, detects breaking changes that touch your code, patches and tests the fix in a sandbox, opens the PR, and stops for your approval before merge.
 
-Upstream Watch watches the third-party APIs your code depends on, patches your code when they
-change, and asks before it merges.
+**How it's built (30s).** TrueForge runs the loop: a watcher subagent per vendor, a patcher subagent that provisions a Daytona sandbox only when there's actually something to fix, an approval checkpoint on merge, and a session that survives me closing the laptop. Bright Data feeds it live changelogs; when a vendor redesigns their docs, the pipeline detects the schema break, repairs its own extraction spec, and puts that repair through review too. Every PR — the agent's and mine — went through Qodo.
 
-## The 90 seconds
+**What broke (15s).** I built the scraper against a fixture I wrote myself. Clean markup,
+sensible class names. Then I fetched the real Stripe changelog: 3 MB, exactly one `<article>`
+tag, class names like `sn-1iugkao` — the entries aren't in the DOM at all, they're in a JSON
+blob the page hydrates from. Every heuristic I'd tuned scored zero. But the blob turned out to
+carry Stripe's own `breaking` flag and the exact API symbols each change touches, so the
+detection ended up more precise than the version I'd designed. A fixture you invent tests your
+assumptions, not the world.
 
-**Problem (20s).** Your code calls Stripe, Twilio, Slack, OpenAI. Those vendors deprecate
-parameters and change response shapes on their own schedule. Nobody reads every changelog. You
-find out in production. _TBD: land this with one concrete number or war story._
+**Ask (15s).** Repo, blog, and demo video are linked. I'd love feedback on whether the approval UX is something you'd trust on a real repo.
 
-**Insight (15s).** An LLM will happily tell you to go read the changelog. That is the gap this
-hackathon is about — advice is cheap, doing the work is not.
-
-**What it does (30s).** Scrapes the changelog. Decides whether the change touches *your* code.
-Opens a sandbox, patches it, runs your tests. Opens a PR with the changelog quoted in the
-description. Then it **stops and asks you**, and remembers where it was when you come back.
-
-**Why the harness (15s).** Every one of those verbs is a harness capability doing real work:
-MCP tools for GitHub, Daytona for isolation, a subagent for the patch, an approval checkpoint
-for the merge, a persistent session for the waiting. _TBD: name the one that surprised you._
-
-**The close (10s).** The agent does the work. The human keeps the merge button. _TBD._
-
-## Questions to have answers ready for
-
-- Why not Dependabot? _TBD — Dependabot watches package versions; this watches vendor
-  behaviour, which ships without a version bump._
-- What if the patch is wrong? _TBD — tests gate the PR, the human gates the merge; a wrong
-  patch costs a review, not an outage._
-- Does it scale past one vendor? _TBD — `agent/targets.yaml` is a list; be honest about what
-  was actually demoed._
+Rules: no "genuinely", no reading, make eye contact on the WOW moments, stop at 90s even mid-sentence.

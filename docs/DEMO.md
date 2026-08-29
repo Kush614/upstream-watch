@@ -1,125 +1,60 @@
-# DEMO — the 3-minute script
+# Demo script — 3 minutes, verbatim
 
-**Target: under 4 minutes from a cold start** (`CLAUDE.md` §9). The spoken script below runs
-about 3:00, leaving slack for things going slowly on the day.
+Setup before judges arrive: TrueForge running, UI open on the Upstream Watch session, terminal
+visible. Run **live** if Bright Data credentials are loaded; otherwise `DEMO_MODE=1` replays
+the committed capture of the real page. Say which one out loud — the run prints its provenance
+and the PR body states it.
 
-Beats marked ✅ work today with no accounts configured. Beats marked ⏳ need the harness,
-Daytona, and the GitHub MCP connector — verify them in preflight (`docs/PLAN.md` §3).
+Reset first: `pnpm demo:rewind --since 2026-08-20`. That forgets the latest Stripe release so
+it shows up as new. Every entry the demo surfaces is genuinely Stripe's, carrying Stripe's own
+`breaking` flag; only our memory of having seen it is rewound.
 
-## Before recording
+**0:00 — The line.** "This watches the APIs your code depends on, fixes your code when they change, and asks before it merges. Not package versions — the docs behind them, which is where the silent breakage lives."
 
-- [ ] `pnpm demo:seed` — **every time.** Without it the run has already seen the change and
-      correctly reports nothing, which looks exactly like a broken demo.
-- [ ] `git status` clean, `demo-app` unpatched
-- [ ] `DEMO_MODE=1`
-- [ ] Harness running, agent saved in the Agents Library, no session open
-- [ ] Previous demo PRs closed so the new one is unambiguous
-- [ ] Terminal font up, browser zoom up, notifications off
-- [ ] Stopwatch visible to you, not to the camera
+**0:15 — Show the victim.** Flash `demo-app/src/payments.ts` — 97 lines, calls
+`stripe.charges.create`. "Tiny payments service. Tests pass." Run `pnpm --filter demo-app test`
+— 14 green.
 
-## The beats
+**0:30 — Start the watch.** In UI: "Check upstream." Doing-panel streams: skill loaded → scrape → cache → diff. "Bright Data pulled the changelog; the pipeline diffed it against last run."
 
-### 0:00 — The problem ✅
+**0:50 — Change found.** Event card: `breaking: true`, straight from Stripe's own flag.
+"Stripe removed support for specifying payment method types on Payment Intents — and it knows
+that's breaking, we didn't have to guess."
 
-**Show:** `demo-app/src/checkout.ts`, the `source: req.token` line.
+Point at the second line: **three other breaking changes in the same release, listed and not
+acted on.** "Those touch payouts and trial offers. We don't call those, so it says so and
+stops. An agent that opens a PR for every deprecation gets muted in a week."
 
-> "This is our checkout code. It calls Stripe's Charges API, and it passes the payment token in
-> a parameter called `source`. Stripe is about to deprecate that parameter. Nobody on a
-> two-person team reads Stripe's changelog every week, so normally we'd find out in production."
+**1:00 — Sandbox spins up.** Doing-panel shows patcher subagent + Daytona provision. "Note: no sandbox until now. Watch turns are cheap; only a real change costs compute." Tests run in sandbox — green.
 
-### 0:20 — Detect ✅
+**1:30 — PR opened.** Did-panel shows PR link. Open it in GitHub: body contains changelog excerpt + diff + test output. Qodo comment visible.
 
-**Run:**
-```bash
-DEMO_MODE=1 DEMO_FIXTURE=breaking pnpm check
-```
+**1:45 — The pause.** Approval card: changelog excerpt on left, code diff on right, "Merge?" "It will not merge on its own. This is the irreversible step."
 
-**Show:** the output naming the entry, the matched symbols, and the affected path.
+**1:55 — WOW 1: reconnect.** Close the tab. Reopen. Card still there, run still paused. "Sessions live in the harness, not the browser."
 
-> "The agent scrapes the changelog through Bright Data — cached here, so this is repeatable —
-> and it doesn't just find the entry. It decides it's breaking, and it decides it's *ours*: it
-> matched `source` inside a code span, and mapped it to `demo-app`.
->
-> Note what it didn't do. There's a second deprecation on that page, for an endpoint we never
-> call. It's listed and ignored. An agent that opens a PR for every deprecation is noise."
+**2:10 — Approve.** Click. PR merges. Did-panel updates.
 
-### 0:50 — Patch, in a sandbox ⏳
+**2:20 — WOW 2: the web changed.** Terminal: `pnpm demo:break-page`. "Stripe redesigned their
+changelog." Trigger check → `SCHEMA MISMATCH · Extraction produced 0 entries`, not a crash.
+Then `pnpm repair --vendor stripe`, the model proposes a new spec, and
+`pnpm validate-spec` gates it against the **cached** HTML — no network — reporting which
+previously-recorded entries the candidate can still find. PR opened on SKILL.md. "It noticed,
+repaired its own extraction spec, checked the repair against the bytes that broke it, and put
+that through review too."
 
-**Show:** the patcher subagent starting, the Daytona sandbox log, `pnpm verify` passing.
+**2:50 — Close.** "Harness does the orchestration, sandbox, approvals, sessions. Bright Data feeds it and stays fed. Every line went through Qodo. Repo and blog are linked."
 
-> "It hands the change to a patcher subagent — a summary, not the whole page — and that subagent
-> opens a Daytona sandbox. The patch is written and the tests run **in there**, not on my
-> laptop. That's the point: this is code an LLM just wrote, and it's about to execute.
->
-> Smallest possible patch: rename the parameter, update the test that pinned the old name."
+## The breaking change
 
-### 1:30 — The pull request ⏳
+**Not seeded — real.** Stripe's `2026-08-26` release, entry *"Removes support for specifying
+payment method types in Payment Intents and Setup Intents"*, `breaking: true`, with
+`affected: ["PaymentIntent#create", "PaymentIntent#confirm", …]`. It maps to
+`demo-app/src/payments.ts` because `agent/targets.yaml` lists `payment_intents` and
+`PaymentIntent#create` among the symbols we call.
 
-**Show:** the real PR on GitHub. Scroll the description.
+A judge can open the permalink the run prints and read it on Stripe's own site. There is no
+invented entry anywhere in the demo.
 
-> "Real PR, through the GitHub MCP tools. The description has the changelog excerpt, the link to
-> the source, why it decided this was breaking, which symbol matched, the diff, and the test
-> output. Someone reviewing this doesn't have to go and find the changelog themselves."
-
-### 1:55 — It stops and asks ⏳ **← slow down here**
-
-**Show:** the approval card. Changelog left, diff right. The run paused.
-
-> "And then it stops.
->
-> It has a working patch, passing tests, and an open PR — and it will not merge. Merging takes
-> an explicit approval. In the code, every irreversible action takes `approved: true` and
-> defaults to a dry run, so the safe path is what you get by doing nothing.
->
-> That's the whole thesis. The agent does the work. I keep the merge button."
-
-### 2:15 — It remembers ⏳
-
-**Show:** hard-refresh the browser. Still paused, same state.
-
-> "The session persists. I can close this and come back on Monday — the watch is still waiting,
-> and it still knows what it found."
-
-### 2:30 — Approve ⏳
-
-**Show:** click Approve → PR merges → it appears in the "Did" panel.
-
-> "Now it merges. And the panel records what it did, so there's a history of every change the
-> watch has handled."
-
-### 2:45 — When the vendor changes the *page* ✅
-
-**Run:**
-```bash
-DEMO_MODE=1 DEMO_FIXTURE=restructured pnpm check
-```
-
-**Show:** zero entries extracted, and a repaired selector proposed.
-
-> "Last thing. Vendors redesign their changelog pages, and scrapers silently return nothing.
->
-> Here the extraction found zero entries — and the agent treats that as a change event, not an
-> error. It re-derives the selectors from the HTML it cached before parsing, checks the new spec
-> actually produces valid entries, and opens a PR for the config change. It repairs itself, and
-> it still asks."
-
-### 3:00 — Close
-
-**Show:** the architecture diagram in `README.md`.
-
-> "Bright Data for the pages, a Daytona sandbox for the patch, GitHub over MCP for the PR, a
-> subagent for the delegation, an approval checkpoint for the merge, and a session that outlives
-> the browser. TrueForge gave us all of that; we wrote the watching."
-
-## Rules
-
-- **Say "cached" when it is cached.** The report prints `provenance` and the PR body states it.
-  Judges notice, and getting caught costs more than the disclosure.
-- If a step fails on camera, say what should have happened and move on. **Do not debug live.**
-- Do not narrate architecture over a running demo. Show the doing; explain at the end.
-
-## Fallback (if the harness is down)
-
-Beats 0:00, 0:20 and 2:45 run with no accounts at all — `pnpm demo:seed` then two `pnpm check`
-commands. Add `pnpm verify` to show the tests, and show a PR the agent opened earlier in the
-day. Narrate honestly which parts are live. `docs/PLAN.md` §6.
+## Backup
+Record a full run at 17:30 with screen recorder. If anything fails live, narrate over the video.
