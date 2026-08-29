@@ -6,7 +6,20 @@
  * schedule and nobody reads the deprecations page.
  */
 
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
 const OPENAI_API = process.env.OPENAI_API_BASE ?? "https://api.openai.com/v1";
+
+/** Prompts are .md files under agent/prompts/, never inline strings (CLAUDE.md §7). */
+const PROMPT_FILE = resolve(dirname(fileURLToPath(import.meta.url)), "../../agent/prompts/risk-summary.md");
+
+/** The body after the `---` separator; everything above it is guidance for humans. */
+function promptTemplate(): string {
+  const raw = readFileSync(PROMPT_FILE, "utf8");
+  return (raw.split(/^---$/m)[1] ?? raw).trim();
+}
 
 /** Pinned deliberately. OpenAI's deprecations page lists a shutdown date for this. */
 export const RISK_MODEL = "gpt-5.6-terra";
@@ -28,13 +41,14 @@ export interface OpenAIApi {
 }
 
 export function buildRiskPrompt(req: RiskRequest): string {
-  return [
-    `Assess fraud risk for a card payment.`,
-    `Amount: ${(req.amountCents / 100).toFixed(2)} ${req.currency.toUpperCase()}`,
-    `Country: ${req.country}`,
-    `Card ending: ${req.cardLast4}`,
-    `Answer with a level (low, medium or high) and one sentence of reasoning.`,
-  ].join("\n");
+  const values: Record<string, string> = {
+    amount: (req.amountCents / 100).toFixed(2),
+    currency: req.currency.toUpperCase(),
+    country: req.country,
+    cardLast4: req.cardLast4,
+  };
+
+  return promptTemplate().replace(/\{\{(\w+)\}\}/g, (whole, key: string) => values[key] ?? whole);
 }
 
 type OpenAIResponseBody = {
@@ -61,6 +75,11 @@ export function createOpenAI(apiKey = process.env.OPENAI_API_KEY ?? ""): OpenAIA
         body: JSON.stringify({
           model: RISK_MODEL,
           input: buildRiskPrompt(req),
+          // The Responses API stores requests by default. This one carries an amount, a
+          // country and the card's last four digits — payment metadata that the previous
+          // Chat Completions call never persisted. Opt out explicitly rather than changing
+          // a deployment's retention behaviour as a side effect of an API migration.
+          store: false,
         }),
       });
 
