@@ -486,3 +486,34 @@ That check, not the search heuristic, is what makes the columns trustworthy.
 risk on that screen — the composed request, the mutable date, the shared buffer, the
 ambiguous commit — existed because the thing being shown had not really happened yet. Make
 it real and they have nothing to attach to.
+
+## 2026-08-30 — Failure paths introduced by the proof UI
+
+Recording these because CLAUDE.md §2.5 asks for it, and because each one is a way the
+screen could be wrong while looking right.
+
+**`saveState()` — proof runner, `scripts/proof-runner.ts`.** Writes `ui/public/last-run.json`
+so a refresh shows the same columns. The write can fail: no disk space, the file made
+read-only, `ui/public/` missing after a clean. It used to be `.catch(() => undefined)`, so
+the run reported success and the next start silently restored an *older* run — or nothing —
+under the same heading, which is the stale-receipt problem the whole PR is about. It now
+logs here instead. It deliberately does **not** throw: the run genuinely happened and the
+columns on screen are real, so losing durability must not delete a true result. The
+observable consequence of a failed write is that a restart shows the previous run, or an
+empty page, never a wrong one.
+
+**`ui/src/lib/trueforge-client.ts` — the UI's transport.** Three calls: read sessions, read
+events, post an approval decision. Every non-2xx response throws `TrueForgeClientError`
+carrying the status; a dead harness throws the underlying network error. Reads propagate to
+`RealAdapter`, which falls back to the frozen `/last-run.json` capture and marks the page as
+offline — a real earlier run, labelled as such. Writes do **not** fall back: a failed
+approval is surfaced to the person who clicked, because a decision that silently does
+nothing leaves them believing they approved a merge that never happened. Separately,
+`MalformedApprovalIdError` marks the one failure that retrying cannot fix — the UI built an
+id without a thread or tool call, which is our bug and not the harness's.
+
+**`demo-app/test/proof-receipt.ts` — the receipt recorder.** Wraps `fetch` during a proof
+run and writes the exchange to `PROOF_RECEIPT`. If that write fails the file is absent, and
+`runSide` throws rather than reporting the run: a missing receipt must not be filled in from
+the previous one. It never records the `Authorization` header, because the receipt is
+written to disk and then rendered in a browser.

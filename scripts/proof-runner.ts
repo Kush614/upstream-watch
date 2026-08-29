@@ -46,8 +46,20 @@ async function loadState(): Promise<void> {
   }
 }
 
+/**
+ * Persist the run so a refresh shows the same screen.
+ *
+ * A swallowed failure here is quietly serious: the response still says the run succeeded,
+ * but the next start restores an older run — or none — under the same heading. So the
+ * failure is logged rather than dropped. It is deliberately NOT thrown: the run really did
+ * happen and the columns on screen are real, so losing durability must not erase them.
+ */
 async function saveState(): Promise<void> {
-  await writeFile(STATE_FILE, `${JSON.stringify(state, null, 2)}\n`, "utf8").catch(() => undefined);
+  try {
+    await writeFile(STATE_FILE, `${JSON.stringify(state, null, 2)}\n`, "utf8");
+  } catch (error) {
+    await logFailure("state write", error);
+  }
 }
 
 function json(res: ServerResponse, code: number, body: unknown): void {

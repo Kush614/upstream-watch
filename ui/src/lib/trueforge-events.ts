@@ -449,6 +449,16 @@ export async function loadSession(sessionId?: string, signal?: AbortSignal): Pro
  *
  * The gate lives in the harness: this posts a decision and the agent resumes or does not.
  */
+/** The approval id did not carry both a thread and a tool call — a UI bug, not a transport one. */
+export class MalformedApprovalIdError extends Error {
+  readonly approvalId: string;
+  constructor(approvalId: string) {
+    super(`Malformed approval id "${approvalId}" — expected "<thread>::<toolCall>"`);
+    this.name = "MalformedApprovalIdError";
+    this.approvalId = approvalId;
+  }
+}
+
 export async function decide(
   sessionId: string,
   approvalId: string,
@@ -456,7 +466,11 @@ export async function decide(
   reason?: string,
 ): Promise<void> {
   const [threadId, toolCallId] = approvalId.split("::");
-  if (!threadId || !toolCallId) throw new Error(`malformed approval id: ${approvalId}`);
+  if (!threadId || !toolCallId) {
+    // Distinct from TrueForgeClientError on purpose: this one means the UI built a bad id,
+    // so retrying will never help and the caller should say something different about it.
+    throw new MalformedApprovalIdError(approvalId);
+  }
 
   await postDecision(
     sessionId,
