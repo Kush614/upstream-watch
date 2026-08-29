@@ -1,53 +1,51 @@
 import { ScrapeError } from "../errors.ts";
 import { cacheHtml } from "../lib/cache.ts";
 import type { ScraperClient } from "./scraper.ts";
-import type { ScrapeResult, WatchTarget } from "../types.ts";
+import type { ScrapeResult, VendorTarget } from "../types.ts";
 
 /**
- * Bright Data scraper client.
+ * Bright Data Web Unlocker client — the live path.
  *
- * !! UNVERIFIED !! The request shape below is a placeholder. The working invocation is a
- * preflight task (docs/PLAN.md §3) and must be recorded in CLAUDE.md §6 and
- * skills/brightdata-changelog-scraper/SKILL.md once confirmed. Until then this client
- * fails loudly rather than pretending: DEMO_MODE=1 is the supported path.
+ * Verified against
+ * https://docs.brightdata.com/scraping-automation/web-unlocker/send-your-first-request:
  *
- * Config comes from CLAUDE.md §6 - do not ask the user for it.
+ *   POST https://api.brightdata.com/request
+ *   Authorization: Bearer $BRIGHTDATA_API_KEY
+ *   {"zone": "<zone>", "url": "<target>", "format": "raw"}
+ *
+ * Config comes from CLAUDE.md §6 — do not ask the user for it.
  */
 
-/** VERIFY against the Bright Data getting-started doc before relying on this. */
-const BRIGHTDATA_ENDPOINT = process.env.BRIGHTDATA_ENDPOINT ?? "";
+const DEFAULT_ENDPOINT = "https://api.brightdata.com/request";
 
-const MAX_ATTEMPTS = 3; // retry: 3 (CLAUDE.md §6)
+/** retry: 3 (CLAUDE.md §6). specs/agent.md: 3 failures ⇒ scrape_failed. */
+export const MAX_ATTEMPTS = 3;
 
 export class BrightDataScraperClient implements ScraperClient {
   readonly #apiKey: string;
   readonly #zone: string;
+  readonly #endpoint: string;
 
   constructor(
     apiKey = process.env.BRIGHTDATA_API_KEY ?? "",
     zone = process.env.BRIGHTDATA_ZONE ?? "",
+    endpoint = process.env.BRIGHTDATA_ENDPOINT ?? DEFAULT_ENDPOINT,
   ) {
     this.#apiKey = apiKey;
     this.#zone = zone;
+    this.#endpoint = endpoint;
   }
 
-  async scrape(target: WatchTarget): Promise<ScrapeResult> {
+  async scrape(target: VendorTarget): Promise<ScrapeResult> {
     if (!this.#apiKey || !this.#zone) {
       throw new ScrapeError(
         "BRIGHTDATA_API_KEY and BRIGHTDATA_ZONE are required for live scraping. " +
-          "Set DEMO_MODE=1 to use committed fixtures instead.",
-        { vendor: target.vendor },
-      );
-    }
-    if (!BRIGHTDATA_ENDPOINT) {
-      throw new ScrapeError(
-        "BRIGHTDATA_ENDPOINT is not set. The working Bright Data invocation is still " +
-          "unverified - see docs/PLAN.md §3 (preflight) and CLAUDE.md §6.",
+          "Set DEMO_MODE=1 to replay the last cached scrape instead.",
         { vendor: target.vendor },
       );
     }
 
-    const html = await this.fetchWithRetry(target);
+    const html = await this.#fetchWithRetry(target);
 
     return {
       vendor: target.vendor,
@@ -58,12 +56,12 @@ export class BrightDataScraperClient implements ScraperClient {
     };
   }
 
-  private async fetchWithRetry(target: WatchTarget): Promise<string> {
+  async #fetchWithRetry(target: VendorTarget): Promise<string> {
     let lastError = "";
 
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
       try {
-        const res = await fetch(BRIGHTDATA_ENDPOINT, {
+        const res = await fetch(this.#endpoint, {
           method: "POST",
           headers: {
             Authorization: `Bearer ${this.#apiKey}`,
@@ -72,14 +70,19 @@ export class BrightDataScraperClient implements ScraperClient {
           body: JSON.stringify({ zone: this.#zone, url: target.url, format: "raw" }),
         });
 
-        if (res.ok) return await res.text();
-        lastError = `${res.status} ${res.statusText}`;
+        if (res.ok) {
+          const body = await res.text();
+          if (body.trim().length > 0) return body;
+          lastError = "Bright Data returned an empty body";
+        } else {
+          lastError = `${res.status} ${res.statusText}: ${(await res.text()).slice(0, 200)}`;
+        }
       } catch (cause) {
         lastError = String(cause);
       }
 
       if (attempt < MAX_ATTEMPTS) {
-        await new Promise((r) => setTimeout(r, 500 * attempt));
+        await new Promise((resolve) => setTimeout(resolve, 500 * attempt));
       }
     }
 

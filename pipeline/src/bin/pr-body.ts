@@ -2,26 +2,21 @@
  * `pnpm pr:body` — render a PR title and description from a change event plus a patch
  * result. Reads JSON on stdin, writes JSON on stdout.
  *
- * This exists so the agent does not compose the PR description freehand. The body carries
- * the changelog excerpt, the source link, the reasoning, and the test log in a fixed shape
- * (docs/PLAN.md §4 H5) — and the untrusted vendor text is quoted by code rather than by a
- * model that just read it.
- *
- *   echo '{"event":…,"patch":…,"provenance":"fixture"}' | pnpm pr:body
+ * This exists so the orchestrator does not compose the PR description freehand: the
+ * untrusted vendor text is quoted by code rather than by a model that just read it.
  */
 
 import { buildPr, type PatchResult } from "../lib/pr.ts";
 import type { ChangeEvent, Provenance } from "../types.ts";
 
-const VALID_PROVENANCE: Provenance[] = ["live", "cache", "fixture"];
+const VALID_PROVENANCE: Provenance[] = ["live", "cache"];
 
 interface Input {
   event: ChangeEvent;
   patch: PatchResult;
   /**
-   * Required, deliberately. Defaulting a missing value to "fixture" would let a live run
-   * publish a PR that says it used cached data - a quiet lie about provenance, which is
-   * the one thing the agent is told never to get wrong.
+   * Required, deliberately. Defaulting would let a live run publish a PR that claims
+   * cached data — a quiet lie about the one thing the agent must never get wrong.
    */
   provenance: Provenance;
 }
@@ -38,29 +33,17 @@ async function main(): Promise<void> {
 
   const { event, patch, provenance } = JSON.parse(raw) as Input;
 
-  if (event?.kind !== "breaking-change") {
-    throw new Error(`pr:body expects a breaking-change event, got "${event?.kind}"`);
+  if (event?.type !== "change") {
+    throw new Error(`pr:body expects a change event, got "${String(event?.type)}"`);
   }
   if (!VALID_PROVENANCE.includes(provenance)) {
     throw new Error(
       `pr:body requires "provenance" to be one of ${VALID_PROVENANCE.join(" | ")}. ` +
-        `It is copied from the run report and must not be guessed.`,
+        `Copy it from the scrape output; it must not be guessed.`,
     );
   }
 
-  console.log(
-    JSON.stringify(
-      buildPr({
-        entry: event.entry,
-        matches: event.matches,
-        patch,
-        provenance,
-        targetPaths: event.targetPaths,
-      }),
-      null,
-      2,
-    ),
-  );
+  console.log(JSON.stringify(await buildPr({ event, patch, provenance }), null, 2));
 }
 
 main().catch((error: unknown) => {

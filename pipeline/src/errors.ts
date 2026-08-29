@@ -1,8 +1,8 @@
 /**
  * Typed errors (CLAUDE.md §7). Top-level handlers log these to NOTES.md in demo/dev.
  *
- * Note what is NOT here: there is no "scrape returned nothing" error. A scrape that
- * returns 0 entries or fails validation is a change event, not a failure (CLAUDE.md §6).
+ * Note what is NOT here: there is no "the page changed" error. A scrape that yields no
+ * usable entries is a SchemaMismatch change event, not a failure (CLAUDE.md §6).
  */
 
 export class UpstreamWatchError extends Error {
@@ -15,10 +15,10 @@ export class UpstreamWatchError extends Error {
   }
 }
 
-/** The vendor page could not be fetched at all. */
+/** The vendor page could not be fetched at all, after retries. */
 export class ScrapeError extends UpstreamWatchError {}
 
-/** agent/targets.yaml or an extraction spec is malformed. */
+/** targets.yaml, an extraction spec, or the JSON schema is malformed. */
 export class ConfigError extends UpstreamWatchError {}
 
 /** An irreversible action was attempted without `{ approved: true }` (CLAUDE.md §7). */

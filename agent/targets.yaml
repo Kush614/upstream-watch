@@ -1,29 +1,18 @@
-# Which vendor pages we watch, and which of our code each one can break.
-# Referenced by CLAUDE.md §6 (targets_file) and specs/scraper-pipeline.md §5.
+# Watch targets. Format is fixed by specs/agent.md §`agent/targets.yaml` format.
 #
-# A changelog entry is acted on only when it is BOTH breaking AND matches a watched
-# symbol below. Breaking-but-irrelevant entries are recorded and ignored -- the
-# baseline fixture contains one (`legacy_reporting`) precisely to prove that.
+# The orchestrator reads this, spawns one watcher subagent per vendor, and maps a
+# ChangeEvent to the code it can break via `files`. Adding a vendor means adding a block
+# here AND an extraction block in skills/brightdata-changelog-scraper/SKILL.md.
 
-version: 1
+repo: Kush614/upstream-watch
 
-targets:
-  - vendor: stripe
-    name: Stripe API changelog
-    url: https://docs.stripe.com/changelog          # VERIFY exact URL when scraping in preflight
-    # Demo mode reads these instead of hitting Bright Data (CLAUDE.md §5).
-    fixtures:
-      baseline: agent/fixtures/html/stripe-changelog.html
-      breaking: agent/fixtures/html/stripe-changelog-breaking.html
-      restructured: agent/fixtures/html/stripe-changelog-restructured.html
-    extraction_spec: pipeline/extraction-specs/stripe.json
-    watches:
-      - path: demo-app/src
-        # API surface we actually call. Matched against entry text, preferring
-        # code-formatted tokens (see specs/scraper-pipeline.md §5).
-        symbols:
-          - source
-          - /v1/charges
-          - Charges API
+vendors:
+  stripe:
+    url: https://docs.stripe.com/changelog
+    schema: schemas/changelog-entry.json
+    # Substring-matched against entry title/body and against the vendor's own
+    # `changed`/`affected` symbol lists. See specs/scraper-pipeline.md §3.
+    symbols: [charges.create, payment_intents, Charge#create, PaymentIntent#create]
+    files: [demo-app/src/payments.ts]
 
-  # Additional vendors are cut #5 in docs/PLAN.md §6. Do not add any until D1-D7 are green.
+  # A second vendor is cut #1 in docs/PLAN.md. Do not add one until the loop is green.

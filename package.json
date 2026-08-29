@@ -8,12 +8,17 @@
   },
   "packageManager": "pnpm@10.13.0",
   "scripts": {
-    "check": "node --experimental-strip-types pipeline/src/index.ts",
+    "check": "pnpm --filter pipeline scrape -- --pretty",
+    "scrape": "pnpm --filter pipeline scrape",
+    "repair": "pnpm --filter pipeline repair",
+    "validate-spec": "pnpm --filter pipeline validate-spec",
+    "pr:body": "pnpm --filter pipeline pr:body",
     "verify": "pnpm -r typecheck && pnpm -r test",
-    "pr:body": "node --experimental-strip-types pipeline/src/bin/pr-body.ts",
+    "demo:break-page": "node --experimental-strip-types scripts/break-page.ts",
+    "demo:restore-page": "node --experimental-strip-types scripts/break-page.ts --restore",
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",
-    "demo:seed": "pnpm --filter pipeline demo:seed"
+    "demo:rewind": "node --experimental-strip-types scripts/rewind-state.ts"
   },
   "devDependencies": {
     "typescript": "^5.6.0",

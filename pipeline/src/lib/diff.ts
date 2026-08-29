@@ -1,26 +1,23 @@
-import { entryKey, getVendorState, type State } from "./state.ts";
+import { entryKey, type VendorState } from "./state.ts";
 import type { ChangelogEntry } from "../types.ts";
 
 export interface DiffResult {
-  /** Entries not present in the last-seen state. */
   added: ChangelogEntry[];
-  /** True on the very first run for a vendor, when everything looks "new". */
+  /** True on the first run for a vendor, when everything looks new. */
   firstRun: boolean;
 }
 
 /**
- * Diff this scrape against what we last saw.
+ * Diff this scrape against the last run (specs/scraper-pipeline.md §3).
  *
- * On a first run every entry is unseen. Reporting a four-year backlog as "just changed"
- * would be noise, so the caller uses `firstRun` to baseline silently instead
- * (specs/agent.md §The loop, step 2).
+ * On a first run every entry is unseen — Stripe alone ships 880. Reporting a multi-year
+ * backlog as "just changed" would be noise, so the caller baselines silently instead.
  */
-export function diffEntries(entries: ChangelogEntry[], state: State, vendor: string): DiffResult {
-  const { seen, lastRun } = getVendorState(state, vendor);
-  const seenKeys = new Set(seen);
+export function diffEntries(entries: ChangelogEntry[], state: VendorState): DiffResult {
+  const seen = new Set(state.seen);
 
   return {
-    added: entries.filter((entry) => !seenKeys.has(entryKey(entry))),
-    firstRun: lastRun === null,
+    added: entries.filter((entry) => !seen.has(entryKey(entry))),
+    firstRun: state.lastCheck === null,
   };
 }

@@ -7,5 +7,7 @@ dist/
 coverage/
 .vite/
 .trueforge/
-.upstream-watch/
-agent/fixtures/html/*-scrape-*.html
+
+# Rolling scrape snapshots (timestamped). current/last-good/restructured are committed.
+agent/fixtures/html/*/20*.html
+pipeline/state/*.repair-context.json

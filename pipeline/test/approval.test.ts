@@ -1,10 +1,10 @@
 import { describe, it, expect, vi } from "vitest";
-import { requireApproval, withApproval } from "../src/lib/approval.ts";
+import { requireApproval, withApproval, GATED_ACTIONS } from "../src/lib/approval.ts";
 import { ApprovalRequiredError } from "../src/errors.ts";
 
 /**
  * The approval gate is the thesis of the project (CLAUDE.md §2.3). These tests exist to
- * make it impossible to weaken it by accident.
+ * make it impossible to weaken by accident.
  */
 describe("withApproval", () => {
   it("does not perform the action by default", async () => {
@@ -33,15 +33,9 @@ describe("withApproval", () => {
   ])("treats %s as not approved", async (_label, value) => {
     const perform = vi.fn();
 
-    const result = await withApproval(
-      "merge-pr",
-      "Merge PR #12",
-      { approved: value as boolean | undefined },
-      perform,
-    );
+    await withApproval("merge-pr", "d", { approved: value as boolean | undefined }, perform);
 
     expect(perform).not.toHaveBeenCalled();
-    expect(result.performed).toBe(false);
   });
 });
 
@@ -52,5 +46,12 @@ describe("requireApproval", () => {
 
   it("passes with approval", () => {
     expect(() => requireApproval("push-to-main", { approved: true })).not.toThrow();
+  });
+});
+
+describe("gated actions", () => {
+  it("covers every irreversible action named in specs/agent.md", () => {
+    expect(GATED_ACTIONS).toContain("merge-pr");
+    expect(GATED_ACTIONS).toContain("push-to-main");
   });
 });

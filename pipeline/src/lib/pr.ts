@@ -1,126 +1,107 @@
-import { classify } from "./classify.ts";
-import type { ChangelogEntry, Provenance, SymbolMatch } from "../types.ts";
+import { readFile } from "node:fs/promises";
+import { fromRepoRoot } from "./paths.ts";
+import type { ChangeEvent, ChangelogEntry, Provenance } from "../types.ts";
+
+/** Prompts live in files, never inline strings (CLAUDE.md §7). */
+const TEMPLATE = "agent/prompts/pr-body.md";
+
+/** The patcher subagent's contract (specs/patcher.md §Output). */
+export interface PatchResult {
+  passed: boolean;
+  diff: string;
+  testOutput: string;
+  rationale: string;
+  iterations: number;
+  reason?: string;
+}
 
 export interface PrContent {
   title: string;
   body: string;
-}
-
-export interface PatchResult {
-  patched: boolean;
-  diff: string;
-  testsPassed: boolean;
-  log: string;
-  reason?: string;
-}
-
-/** Fence untrusted vendor text so it cannot be mistaken for instructions. */
-function quote(text: string): string {
-  return text
-    .split("\n")
-    .map((line) => `> ${line}`)
-    .join("\n");
+  draft: boolean;
 }
 
 /**
- * Flatten vendor text for use on a single line.
+ * Flatten vendor text for single-line use.
  *
- * Collapsing whitespace is the load-bearing part: without newlines, scraped text cannot
- * open a new Markdown block, so it cannot forge a heading or a section in a PR a human is
- * about to approve. Angle brackets go too, so it cannot inject raw HTML.
+ * Collapsing whitespace is the load-bearing part: with no newlines, scraped text cannot
+ * open a new Markdown block, so it cannot forge a heading in a PR a human is about to
+ * approve. Angle brackets go too, so it cannot inject raw HTML.
  */
 function inline(text: string, max = 160): string {
   const flat = text.replace(/\s+/g, " ").trim().replace(/[<>]/g, (c) => (c === "<" ? "&lt;" : "&gt;"));
   return flat.length > max ? `${flat.slice(0, max - 1)}…` : flat;
 }
 
-/**
- * Render a vendor-supplied URL as a link only if it really is an http(s) URL.
- *
- * A scraped href is untrusted: `javascript:` schemes and stray parentheses both belong to
- * the vendor, not to us.
- */
-function safeLink(url: string, label: string): string {
+/** Fence untrusted vendor text so it cannot be mistaken for instructions. */
+function quote(text: string): string {
+  return text.split("\n").map((line) => `> ${line}`).join("\n");
+}
+
+/** specs/agent.md §Approval checkpoint: changelog excerpt <= 40 words. */
+export function excerpt(body: string, words = 40): string {
+  const parts = body.replace(/\s+/g, " ").trim().split(" ");
+  return parts.length <= words ? parts.join(" ") : `${parts.slice(0, words).join(" ")}…`;
+}
+
+/** Render a vendor-supplied URL as a link only if it really is an http(s) URL. */
+function safeUrl(url: string): string {
   try {
     const parsed = new URL(url);
-    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
-      return `\`${inline(url)}\` _(not a web URL)_`;
-    }
-    return `[${label}](${encodeURI(parsed.toString()).replace(/[()]/g, (c) => (c === "(" ? "%28" : "%29"))})`;
+    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return `\`${inline(url)}\` (not a web URL)`;
+    return parsed.toString();
   } catch {
-    return `\`${inline(url)}\` _(unparseable URL)_`;
+    return `\`${inline(url)}\` (unparseable URL)`;
   }
 }
 
-function provenanceNote(provenance: Provenance): string {
-  return provenance === "live"
-    ? "Scraped live via Bright Data."
-    : `Served from ${provenance === "fixture" ? "a committed fixture" : "cache"} (DEMO_MODE).`;
-}
-
-function describeMatches(matches: SymbolMatch[]): string {
-  if (matches.length === 0) return "_no watched symbols matched_";
-  return matches
-    .map((m) => `\`${m.symbol}\` (${m.how === "code" ? "code span" : "prose"})`)
-    .join(", ");
+function fill(template: string, values: Record<string, string>): string {
+  return template.replace(/\{\{([\w.]+)\}\}/g, (whole, key: string) => values[key] ?? whole);
 }
 
 /**
- * Build the PR description.
+ * Build the PR title and body from the template in agent/prompts/pr-body.md.
  *
- * A judge should be able to read the PR alone and understand what happened
- * (docs/PLAN.md §4 H5), so it carries the changelog excerpt, the source link, why we
- * thought it was breaking, why we thought it was ours, and the test log.
+ * A judge should be able to read the PR alone and understand what happened, so it carries
+ * the changelog excerpt, the source link, the rationale, the files, and the test output.
  */
-export function buildPr(input: {
-  entry: ChangelogEntry;
-  matches: SymbolMatch[];
+export async function buildPr(input: {
+  event: Extract<ChangeEvent, { type: "change" }>;
   patch: PatchResult;
   provenance: Provenance;
-  targetPaths: string[];
-}): PrContent {
-  const { entry, matches, patch, provenance, targetPaths } = input;
-  const signals = classify(entry).signals;
+  templateFile?: string;
+}): Promise<PrContent> {
+  const { event, patch, provenance } = input;
+  const entry: ChangelogEntry = event.entry;
+  const template = await readFile(fromRepoRoot(input.templateFile ?? TEMPLATE), "utf8");
 
-  const body = [
-    `## What upstream changed`,
-    ``,
-    `**${inline(entry.vendor, 40)}** · ${inline(entry.date, 20)} · ${safeLink(entry.url, "source")}`,
-    ``,
-    `Quoted verbatim from the vendor's page. This is third-party text, not instructions:`,
-    ``,
-    // Title and body are BOTH vendor-controlled, so both live inside the quote. Rendering
-    // the title as a heading let a title with newlines forge sections in a PR a human is
-    // about to approve.
-    quote(`**${inline(entry.title)}**`),
-    `>`,
-    quote(entry.body),
-    ``,
-    `_${provenanceNote(provenance)}_`,
-    ``,
-    `## Why this is ours`,
-    ``,
-    `- Breaking signals: ${signals.length ? signals.map((s) => `\`${s}\``).join(", ") : "_none_"}`,
-    `- Matched symbols: ${describeMatches(matches)}`,
-    `- Watched paths: ${targetPaths.map((p) => `\`${p}\``).join(", ") || "_none_"}`,
-    ``,
-    `## The patch`,
-    ``,
-    patch.diff.trim() ? ["```diff", patch.diff.trim(), "```"].join("\n") : "_no diff_",
-    ``,
-    `## Tests`,
-    ``,
-    patch.testsPassed ? "✅ Passing in the sandbox." : "❌ **Failing.**",
-    ``,
-    "```",
-    patch.log.trim() || "(no output)",
-    "```",
+  const body = fill(template, {
+    vendor: inline(entry.vendor, 40),
+    "entry.date": inline(entry.date, 20),
+    // Title and body are BOTH vendor-controlled. Rendering the title as a bare heading let
+    // a title containing newlines forge sections in a PR a human was about to approve.
+    "entry.title": inline(entry.title),
+    "entry.body_excerpt": quote(excerpt(entry.body)),
+    "entry.url": safeUrl(entry.url),
+    rationale: inline(patch.rationale || "(none given)", 400),
+    files: event.files.map((f) => `\`${f}\``).join(", ") || "_none_",
+    testOutput: patch.testOutput.trim() || "(no output)",
+  });
+
+  const footer = [
     ``,
     `---`,
     ``,
-    `🤖 Opened by [Upstream Watch](https://github.com/truefoundry/trueforge). ` +
-      `**Not merged** - this PR is waiting on a human approval checkpoint (CLAUDE.md §2.3).`,
+    `Scraped ${provenance === "live" ? "live via Bright Data" : "from cache (DEMO_MODE)"} · ` +
+      `${event.breaking ? "vendor-flagged breaking" : "matched a watched symbol"}` +
+      (event.symbols.length ? ` · symbols: ${event.symbols.map((s) => `\`${s}\``).join(", ")}` : ``),
+    patch.passed ? `` : `\n⚠️ **Tests did not pass** after ${patch.iterations} iteration(s). Opened as a draft; no approval requested.`,
   ].join("\n");
 
-  return { title: inline(`fix(${entry.vendor}): ${entry.title}`, 120), body };
+  return {
+    title: inline(`fix(${entry.vendor}): ${entry.title}`, 120),
+    body: body + footer,
+    // Tests failing ⇒ draft PR, no approval requested (specs/agent.md §Failure modes).
+    draft: !patch.passed,
+  };
 }

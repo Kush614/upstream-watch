@@ -5,64 +5,61 @@ import { fromRepoRoot } from "./paths.ts";
 import type { ChangelogEntry } from "../types.ts";
 
 /**
- * Last-seen state. A plain JSON file, gitignored.
- *
- * Deliberately not in the harness's SQLite: the pipeline runs as a plain script, and
- * keeping its state local means `pnpm demo:seed` can reset the demo by deleting one file.
+ * Last-known entries per vendor, committed for demo reproducibility
+ * (docs/ARCHITECTURE.md §1, specs/scraper-pipeline.md §2.5).
  */
-const STATE_FILE = ".upstream-watch/state.json";
+export function statePath(vendor: string): string {
+  return `pipeline/state/${vendor}.last.json`;
+}
 
 export interface VendorState {
+  vendor: string;
+  lastCheck: string | null;
+  /** `${date}::${title}` for every entry we have already reported. */
   seen: string[];
-  lastRun: string | null;
 }
 
-export type State = Record<string, VendorState>;
-
-/** Stable identity for an entry. The permalink is the vendor's own identifier. */
-export function entryKey(entry: Pick<ChangelogEntry, "vendor" | "date" | "url" | "title">): string {
-  return entry.url || `${entry.vendor}:${entry.date}:${entry.title}`;
+/** Entry identity is (date, title) per specs/scraper-pipeline.md §3. */
+export function entryKey(entry: Pick<ChangelogEntry, "date" | "title">): string {
+  return `${entry.date}::${entry.title}`;
 }
 
-export async function loadState(file = STATE_FILE): Promise<State> {
+export async function loadState(vendor: string, file?: string): Promise<VendorState> {
+  const path = file ?? statePath(vendor);
   let raw: string;
 
   try {
-    raw = await readFile(fromRepoRoot(file), "utf8");
+    raw = await readFile(fromRepoRoot(path), "utf8");
   } catch (cause) {
-    // A missing file is the normal first-run case. Anything else - a permission error,
-    // a transient I/O failure - must not be silently treated as "never seen anything",
-    // because that baselines the whole page and suppresses every change since the last
-    // good run.
-    if ((cause as NodeJS.ErrnoException)?.code === "ENOENT") return {};
-    throw new ConfigError(`Could not read state file ${file}`, { cause: String(cause) });
+    // A missing file is a genuine cold start. Anything else - a permission error, a
+    // transient I/O failure - must not silently baseline the page, because that suppresses
+    // every change since the last good run.
+    if ((cause as NodeJS.ErrnoException)?.code === "ENOENT") {
+      return { vendor, lastCheck: null, seen: [] };
+    }
+    throw new ConfigError(`Could not read state file ${path}`, { cause: String(cause) });
   }
 
   try {
-    return JSON.parse(raw) as State;
+    return JSON.parse(raw) as VendorState;
   } catch (cause) {
     throw new ConfigError(
-      `State file ${file} is not valid JSON. Delete it to start fresh, or fix it - ` +
+      `State file ${path} is not valid JSON. Delete it to start fresh, or fix it — ` +
         `silently baselining would hide every change since the last good run.`,
       { cause: String(cause) },
     );
   }
 }
 
-export async function saveState(state: State, file = STATE_FILE): Promise<void> {
-  const path = fromRepoRoot(file);
+export async function saveState(state: VendorState, file?: string): Promise<void> {
+  const path = fromRepoRoot(file ?? statePath(state.vendor));
   await mkdir(dirname(path), { recursive: true });
   await writeFile(path, `${JSON.stringify(state, null, 2)}\n`, "utf8");
 }
 
-export function getVendorState(state: State, vendor: string): VendorState {
-  return state[vendor] ?? { seen: [], lastRun: null };
-}
-
-export function markSeen(state: State, vendor: string, entries: ChangelogEntry[]): State {
-  const current = getVendorState(state, vendor);
-  const seen = new Set(current.seen);
+export function withSeen(state: VendorState, entries: ChangelogEntry[]): VendorState {
+  const seen = new Set(state.seen);
   for (const entry of entries) seen.add(entryKey(entry));
 
-  return { ...state, [vendor]: { seen: [...seen], lastRun: new Date().toISOString() } };
+  return { ...state, lastCheck: new Date().toISOString(), seen: [...seen] };
 }

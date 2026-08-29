@@ -1,34 +1,42 @@
 import type { ChangelogEntry } from "../types.ts";
 
 /**
- * Signals that an entry describes a change that can break a caller.
+ * Decide whether an entry is breaking, and which watched symbols it touches.
  *
- * Deliberately a keyword heuristic rather than a model call: it is deterministic, free,
- * testable offline, and auditable on camera. The cost is precision - see
- * specs/scraper-pipeline.md §3 for the trade-off and when to revisit it.
+ * Two independent signals, per specs/agent.md §2 ("breaking: true OR entries mentioning
+ * any symbol"):
+ *
+ *  - `breaking` — the vendor's own flag when the page publishes one, else the
+ *    `breaking_hint` substrings from the extraction spec.
+ *  - `symbols`  — substring matches against `targets.yaml[vendor].symbols`.
+ *
+ * specs/scraper-pipeline.md §3 folds symbols into the breaking flag itself. Kept separate
+ * here because they answer different questions — "is this dangerous" and "is this ours" —
+ * and the PR body is more honest when it can say which one fired.
  */
-const BREAKING_SIGNALS: Array<{ id: string; pattern: RegExp }> = [
-  { id: "breaking-change", pattern: /\bbreaking\s+change\b/i },
-  { id: "deprecated", pattern: /\bdeprecat(?:e|ed|ing|ion)\b/i },
-  { id: "will-be-removed", pattern: /\b(?:will\s+be|is|are|has\s+been)\s+removed\b/i },
-  { id: "no-longer", pattern: /\bno\s+longer\s+(?:supported|available|accepted|returned)\b/i },
-  { id: "must-migrate", pattern: /\b(?:must|should)\s+migrate\b/i },
-  { id: "renamed", pattern: /\b(?:renamed|replaced)\s+(?:to|by|with)\b/i },
-];
 
 export interface Classification {
   breaking: boolean;
-  /** Which signals fired. Shown in the PR body so a human can check the reasoning. */
-  signals: string[];
+  /** Why we think so: the vendor's flag, or the hints that matched. */
+  reasons: string[];
+  symbols: string[];
 }
 
-export function classify(entry: Pick<ChangelogEntry, "title" | "body">): Classification {
-  const text = `${entry.title}\n${entry.body}`;
-  const signals = BREAKING_SIGNALS.filter((s) => s.pattern.test(text)).map((s) => s.id);
-  return { breaking: signals.length > 0, signals };
-}
+export function classify(
+  entry: Pick<ChangelogEntry, "title" | "body" | "breaking">,
+  breakingHints: string[],
+  symbols: string[],
+): Classification {
+  const haystack = `${entry.title}\n${entry.body}`.toLowerCase();
 
-/** Classify in place, returning a new entry. */
-export function withClassification(entry: ChangelogEntry): ChangelogEntry {
-  return { ...entry, breaking: classify(entry).breaking };
+  const reasons: string[] = [];
+  if (entry.breaking) reasons.push("vendor-flagged");
+
+  for (const hint of breakingHints) {
+    if (hint && haystack.includes(hint.toLowerCase())) reasons.push(`hint:${hint}`);
+  }
+
+  const matched = symbols.filter((symbol) => symbol && haystack.includes(symbol.toLowerCase()));
+
+  return { breaking: reasons.length > 0, reasons, symbols: matched };
 }

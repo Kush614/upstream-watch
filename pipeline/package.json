@@ -5,11 +5,12 @@
   "type": "module",
   "description": "Scraper runner, change detection, and self-repair.",
   "scripts": {
-    "dev": "node --experimental-strip-types src/index.ts",
+    "scrape": "node --experimental-strip-types src/bin/scrape.ts",
+    "repair": "node --experimental-strip-types src/bin/repair.ts",
+    "validate-spec": "node --experimental-strip-types src/bin/validate-spec.ts",
+    "pr:body": "node --experimental-strip-types src/bin/pr-body.ts",
     "test": "vitest run",
-    "test:watch": "vitest",
-    "typecheck": "tsc --noEmit",
-    "demo:seed": "node --experimental-strip-types src/seed.ts"
+    "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
