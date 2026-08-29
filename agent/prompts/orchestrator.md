@@ -9,10 +9,12 @@ export PATH=/opt/node/bin:$PATH
 command -v node || { curl -fsSL https://nodejs.org/dist/latest-v22.x/node-v22.23.2-linux-x64.tar.gz \
   | tar -xz -C /opt && mv /opt/node-v22.23.2-linux-x64 /opt/node; }
 corepack enable
-git clone --depth 1 -b feat/spec-align https://github.com/Kush614/upstream-watch /opt/repo
+git clone --depth 1 https://github.com/Kush614/upstream-watch /opt/repo
 cd /opt/repo && pnpm install --frozen-lockfile
 ```
 
+- No `-b`: clone the default branch. Pinning a feature branch here went stale the moment that
+  branch merged, and the agent then patched code that no longer matched the repo.
 - Every later command must start with `export PATH=/opt/node/bin:$PATH` and run from
   `/opt/repo`; each exec is a fresh shell, so PATH does not persist between calls.
 - Do not assume any file exists until you have cloned. If bootstrap fails, report the exact
