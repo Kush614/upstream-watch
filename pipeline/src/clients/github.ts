@@ -38,6 +38,25 @@ async function git(args: string[], cwd = REPO_ROOT): Promise<string> {
   }
 }
 
+/**
+ * Run git with input on stdin.
+ *
+ * `git apply -` reads the patch from stdin and blocks until the stream closes, so calling
+ * it without writing anything hangs rather than validating. That is worth its own helper:
+ * both the check and the apply need it, and using the plain `git()` above silently does
+ * the wrong thing.
+ */
+async function gitWithStdin(args: string[], input: string, cwd = REPO_ROOT): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    const child = execFile("git", args, { cwd, maxBuffer: 20 * 1024 * 1024 }, (error, _out, stderr) =>
+      error
+        ? reject(new GitHubError(`git ${args.join(" ")} failed`, { stderr: String(stderr).slice(0, 500) }))
+        : resolve(),
+    );
+    child.stdin?.end(input);
+  });
+}
+
 export interface OpenPrInput {
   branch: string;
   base: string;
@@ -76,15 +95,26 @@ export class GhCliClient implements GitHubClient {
   async openPr(input: OpenPrInput): Promise<PrRef> {
     const startingPoint = await git(["rev-parse", "--abbrev-ref", "HEAD"]);
 
+    // `checkout -B` resets an existing branch to base, destroying its tip. A retry after a
+    // half-finished run would silently discard the earlier attempt, so refuse instead.
+    const exists = await git(["branch", "--list", input.branch]);
+    if (exists.trim()) {
+      throw new GitHubError(
+        `branch "${input.branch}" already exists — refusing to reset it. ` +
+          `Delete it or choose another name.`,
+        { branch: input.branch },
+      );
+    }
+
     try {
-      await git(["checkout", "-q", "-B", input.branch, input.base]);
+      await git(["checkout", "-q", "-b", input.branch, input.base]);
 
       if (input.diff.trim()) {
-        // Validate before mutating the working tree.
-        await git(["apply", "--check", "-"]).catch(() => {
+        // Validate before mutating the working tree. `--check` reads the patch on stdin.
+        await gitWithStdin(["apply", "--check", "-"], input.diff).catch(() => {
           throw new GitHubError("patch does not apply cleanly", { branch: input.branch });
         });
-        await this.#applyDiff(input.diff);
+        await gitWithStdin(["apply", "-"], input.diff);
       }
 
       await git(["add", "-A"]);
@@ -105,15 +135,6 @@ export class GhCliClient implements GitHubClient {
     } finally {
       await git(["checkout", "-q", startingPoint]).catch(() => undefined);
     }
-  }
-
-  async #applyDiff(diff: string): Promise<void> {
-    await new Promise<void>((resolve, reject) => {
-      const child = execFile("git", ["apply", "-"], { cwd: REPO_ROOT }, (error) =>
-        error ? reject(new GitHubError("git apply failed", { error: String(error) })) : resolve(),
-      );
-      child.stdin?.end(diff);
-    });
   }
 
   async commentOnPr(prNumber: number, body: string): Promise<void> {

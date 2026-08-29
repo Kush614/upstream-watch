@@ -101,8 +101,12 @@ function ApprovalCard({
       </div>
 
       <footer className="card__foot">
-        <span className={`badge ${item.testsPassed ? "badge--pass" : "badge--fail"}`}>
-          {item.testsPassed ? "tests pass" : "tests fail"}
+        <span
+          className={`badge ${
+            item.testsPassed === true ? "badge--pass" : item.testsPassed === false ? "badge--fail" : ""
+          }`}
+        >
+          {item.testsPassed === true ? "tests pass" : item.testsPassed === false ? "tests fail" : "test result unknown"}
         </span>
         <a href={item.prUrl} target="_blank" rel="noreferrer noopener">
           PR #{item.prNumber} ↗

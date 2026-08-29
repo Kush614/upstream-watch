@@ -14,6 +14,7 @@ import { lastGoodPath, currentHtmlPath, newestSnapshot, readCached } from "../li
 import { entryKey } from "../lib/state.ts";
 import { extractEntries } from "../lib/parse.ts";
 import { fromRepoRoot } from "../lib/paths.ts";
+import { ConfigError } from "../errors.ts";
 import { compareRecorded } from "../lib/regression.ts";
 import { parseSpecs } from "../lib/spec.ts";
 import { loadTarget } from "../lib/targets.ts";
@@ -25,12 +26,28 @@ import type { ChangelogEntry } from "../types.ts";
  * Independent of the candidate, which is the whole point.
  */
 async function readRecordedExamples(vendor: string): Promise<string[]> {
+  const path = `pipeline/state/${vendor}.repair-context.json`;
+  let raw: string;
+
   try {
-    const raw = await readFile(fromRepoRoot(`pipeline/state/${vendor}.repair-context.json`), "utf8");
+    raw = await readFile(fromRepoRoot(path), "utf8");
+  } catch (cause) {
+    // "Never run" and "cannot be read" are different problems with the same symptom -
+    // an empty example list - and only one of them is fine. Collapsing them would let a
+    // corrupt repair artifact quietly skip the regression comparison entirely.
+    if ((cause as NodeJS.ErrnoException)?.code === "ENOENT") return [];
+    throw new ConfigError(`Could not read ${path}`, { cause: String(cause) });
+  }
+
+  try {
     const context = JSON.parse(raw) as { examples?: ChangelogEntry[] };
     return (context.examples ?? []).map((e) => entryKey(e));
-  } catch {
-    return [];
+  } catch (cause) {
+    throw new ConfigError(
+      `${path} is not valid JSON. Re-run \`pnpm repair --vendor ${vendor}\` — validating ` +
+        `without recorded examples would skip the regression check silently.`,
+      { cause: String(cause) },
+    );
   }
 }
 

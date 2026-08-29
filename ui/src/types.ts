@@ -32,7 +32,8 @@ export interface PendingApproval {
   entry: ChangelogExcerpt;
   files: string[];
   diff: string;
-  testsPassed: boolean;
+  /** null = we do not know. Never assume passing: a human is about to merge on this. */
+  testsPassed: boolean | null;
   testOutput: string;
   prUrl: string;
   prNumber: number;
@@ -58,6 +59,8 @@ export interface SessionSummary {
 
 export interface SessionState {
   connected: boolean;
+  /** Set when the harness answered but part of the read failed. */
+  error?: string;
   source: "trueforge" | "local";
   summary: SessionSummary;
   steps: Step[];

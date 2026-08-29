@@ -90,33 +90,78 @@ function toStep(event: ServerEvent, index: number): Step | null {
 /**
  * Turn a `tool.approval_required` event into an approval card.
  *
- * The changelog excerpt and diff come from the tool call's own arguments — the agent
- * passes them when it asks to merge — so the card shows the scraped text rather than a
- * summary of it (specs/scraper-pipeline.md §6).
+ * `merge_pull_request` does NOT carry patch evidence — its schema is owner / repo /
+ * pullNumber / commit_title / merge_method. So the PR identity comes from those arguments,
+ * and the changelog excerpt and diff are recovered from the `create_pull_request` call
+ * earlier in the same thread, which is where the agent actually put them.
+ *
+ * What is not recoverable stays empty, and `testsPassed` stays null rather than defaulting
+ * to true. A card that claims passing tests because a field was absent is the worst thing
+ * this panel could do: a human is about to merge on the strength of it.
  */
-function toApproval(event: ServerEvent): PendingApproval[] {
+function toApproval(event: ServerEvent, all: ServerEvent[]): PendingApproval[] {
+  const created = all
+    .filter((e) => e.thread_id === event.thread_id)
+    .flatMap((e) => e.tool_calls ?? [])
+    .findLast((c) => c.name === "create_pull_request");
+
+  const prArgs = (created?.arguments ?? {}) as Record<string, unknown>;
+  const prBody = String(prArgs.body ?? "");
+
   return (event.tool_calls ?? []).map((call, i) => {
-    const args = (call.arguments ?? {}) as Record<string, string | undefined>;
+    const args = (call.arguments ?? {}) as Record<string, unknown>;
+    const owner = String(args.owner ?? "");
+    const repo = String(args.repo ?? "");
+    const pullNumber = Number(args.pullNumber ?? args.pull_number ?? 0);
+
     return {
       id: `${event.thread_id ?? ""}::${call.id ?? call.tool_call_id ?? i}`,
       action: call.name ?? "merge_pull_request",
-      entry: {
-        vendor: args.vendor ?? "unknown",
-        date: args.date ?? "",
-        title: args.title ?? call.name ?? "Pending action",
-        body: args.excerpt ?? args.body ?? "",
-        url: args.url ?? "",
-        breaking: args.breaking === "true",
-        symbols: args.symbols ? String(args.symbols).split(",").map((s) => s.trim()) : [],
-      },
-      files: args.files ? String(args.files).split(",").map((s) => s.trim()) : [],
-      diff: args.diff ?? "",
-      testsPassed: args.testsPassed !== "false",
-      testOutput: args.testOutput ?? "",
-      prUrl: args.prUrl ?? "",
-      prNumber: Number(args.prNumber ?? 0),
+      entry: parseEvidence(prBody, String(prArgs.title ?? call.name ?? "Pending action")),
+      files: filesFrom(prBody),
+      diff: fencedBlock(prBody, "diff"),
+      testsPassed: testResultFrom(prBody),
+      testOutput: fencedBlock(prBody, ""),
+      prUrl: owner && repo && pullNumber ? `https://github.com/${owner}/${repo}/pull/${pullNumber}` : "",
+      prNumber: pullNumber,
     };
   });
+}
+
+/** Pull a fenced code block out of the PR body the agent wrote. */
+export function fencedBlock(body: string, lang: string): string {
+  const match = new RegExp("```" + lang + "\\n([\\s\\S]*?)```").exec(body);
+  return match?.[1]?.trim() ?? "";
+}
+
+export function filesFrom(body: string): string[] {
+  const line = /\*\*Files changed:\*\*\s*(.+)/.exec(body)?.[1] ?? "";
+  return [...line.matchAll(/`([^`]+)`/g)].map((m) => m[1] ?? "").filter(Boolean);
+}
+
+/** Only a definite statement counts. Absence means unknown, not pass. */
+export function testResultFrom(body: string): boolean | null {
+  if (/Tests did not pass|❌/.test(body)) return false;
+  if (/\d+ passed|✅/.test(body)) return true;
+  return null;
+}
+
+/** Recover the changelog excerpt the PR body quotes (agent/prompts/pr-body.md). */
+export function parseEvidence(body: string, fallbackTitle: string): PendingApproval["entry"] {
+  const quoted = [...body.matchAll(/^>\s?(.*)$/gm)].map((m) => m[1] ?? "").join(" ").trim();
+  const bold = /^>\s*\*\*(.+?)\*\*/m.exec(body)?.[1];
+
+  return {
+    vendor: /## Upstream change detected — (\S+)/.exec(body)?.[1] ?? "unknown",
+    date: /\((\d{4}-\d{2}-\d{2})\)/.exec(body)?.[1] ?? "",
+    title: bold ?? fallbackTitle,
+    body: quoted.replace(bold ? `**${bold}**` : "", "").trim(),
+    url: /Source:\s*(\S+)/.exec(body)?.[1] ?? "",
+    breaking: /vendor-flagged breaking/.test(body),
+    symbols: [...body.matchAll(/symbols: (.+)/g)].flatMap((m) =>
+      [...(m[1] ?? "").matchAll(/`([^`]+)`/g)].map((s) => s[1] ?? ""),
+    ),
+  };
 }
 
 /* ──────────────────────────────── loading ────────────────────────────────── */
@@ -133,7 +178,21 @@ export async function loadSession(signal?: AbortSignal): Promise<SessionState> {
   const sessionId = await currentSessionId(signal);
 
   if (sessionId) {
-    const events = unwrap<ServerEvent>(await getJson(`${API}/sessions/${sessionId}/events`, signal));
+    const raw = await getJson<unknown>(`${API}/sessions/${sessionId}/events`, signal);
+
+    // The session exists but its events did not load. Reporting connected here would show
+    // "harness connected" with zero pending approvals — hiding a merge waiting on a human,
+    // which is the one thing this panel must never do.
+    if (raw === null) {
+      return {
+        ...EMPTY,
+        connected: false,
+        source: "trueforge",
+        error: "connected to the harness, but could not read session events — approvals may be hidden",
+      };
+    }
+
+    const events = unwrap<ServerEvent>(raw);
 
     const steps = events.map(toStep).filter((s): s is Step => s !== null).slice(-40);
     const answered = new Set(
@@ -141,7 +200,7 @@ export async function loadSession(signal?: AbortSignal): Promise<SessionState> {
     );
     const pending = events
       .filter((e) => e.type === "tool.approval_required")
-      .flatMap(toApproval)
+      .flatMap((e) => toApproval(e, events))
       .filter((a) => !answered.has(a.id.split("::")[1] ?? ""));
 
     return {

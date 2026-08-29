@@ -56,7 +56,7 @@ export function App() {
         </div>
       </header>
 
-      {error && <p className="error">{error}</p>}
+      {(error || state.error) && <p className="error">{error ?? state.error}</p>}
 
       <main className="panels">
         <section className="panel">
