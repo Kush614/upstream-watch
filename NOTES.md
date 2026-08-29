@@ -379,3 +379,20 @@ component capable of saying no.
 
 Worth noting how it was found: not by testing the proxy, but by trying to approve a real
 merge through it. The UI had passed its unit tests all along.
+
+## 2026-08-30 — Moving a prompt into a file makes the file a dependency
+
+**Where:** `demo-app/src/risk.ts`, `agent/prompts/risk-summary.md`
+**Symptom:** None yet — caught in review before it could happen.
+**Cause:** Moving the fraud-risk instructions out of TypeScript and into
+`agent/prompts/risk-summary.md` satisfies `CLAUDE.md` §7, but it turns a string that could
+never fail into a file read that can. A missing or unbundled Markdown file would surface as a
+bare `ENOENT` thrown from inside a payment request — a confusing place to discover that a docs
+file was not deployed. The same applies if the file exists but has nothing below its `---`
+separator: the model would receive an empty prompt and answer anyway.
+**Fix:** `promptTemplate()` catches both and throws with the path and the reason, naming
+`CLAUDE.md` §7 so the next person knows the file is load-bearing rather than documentation.
+**Lesson:** "Move it into a config file" is not free. Every string promoted to a file becomes a
+deployment artifact, and every artifact can be absent. The rule that prompts live in `.md`
+files is a good one; it just quietly adds a failure path each time it is applied, and those are
+worth handling where they occur rather than at the top of a request.

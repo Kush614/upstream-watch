@@ -15,10 +15,29 @@ const OPENAI_API = process.env.OPENAI_API_BASE ?? "https://api.openai.com/v1";
 /** Prompts are .md files under agent/prompts/, never inline strings (CLAUDE.md §7). */
 const PROMPT_FILE = resolve(dirname(fileURLToPath(import.meta.url)), "../../agent/prompts/risk-summary.md");
 
-/** The body after the `---` separator; everything above it is guidance for humans. */
+/**
+ * The body after the `---` separator; everything above it is guidance for humans.
+ *
+ * A missing or empty prompt file is a real failure path — the file is data, and data goes
+ * missing. Left to `readFileSync` it surfaces as a bare ENOENT from inside a payment
+ * request, which is a confusing place to learn that a Markdown file was not deployed. It
+ * fails here instead, saying which file and why. See NOTES.md 2026-08-30.
+ */
 function promptTemplate(): string {
-  const raw = readFileSync(PROMPT_FILE, "utf8");
-  return (raw.split(/^---$/m)[1] ?? raw).trim();
+  let raw: string;
+  try {
+    raw = readFileSync(PROMPT_FILE, "utf8");
+  } catch (cause) {
+    throw new Error(
+      `Risk prompt not found at ${PROMPT_FILE}. Prompts live in .md files under ` +
+        `agent/prompts/ (CLAUDE.md §7) and must ship with the app. (${String(cause)})`,
+    );
+  }
+
+  const body = (raw.split(/^---$/m)[1] ?? raw).trim();
+  if (!body) throw new Error(`Risk prompt at ${PROMPT_FILE} has no body below the --- separator.`);
+
+  return body;
 }
 
 /** Pinned deliberately. OpenAI's deprecations page lists a shutdown date for this. */
