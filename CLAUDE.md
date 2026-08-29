@@ -128,6 +128,11 @@ curl -X POST https://api.brightdata.com/request \
 
 `pipeline/src/clients/brightdata.ts` issues exactly that request.
 
+**Two vendors, two provenances.** Bright Data's compliance policy refuses `docs.stripe.com`
+(`policy_20050` — payments domains are KYC-gated), so Stripe carries `source: cache` in
+`agent/targets.yaml` and is watched from a committed real capture. **Cloudflare is scraped
+live.** Every run prints which is which, and so does every PR body. See NOTES.md 2026-08-30.
+
 Extraction spec, mirrored from `skills/brightdata-changelog-scraper/SKILL.md` (change both
 in the same commit):
 

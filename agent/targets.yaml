@@ -9,10 +9,24 @@ repo: Kush614/upstream-watch
 vendors:
   stripe:
     url: https://docs.stripe.com/changelog
+    # Bright Data refuses this domain: policy_20050, "target site requires special
+    # permission" — payments sites are KYC-gated. Watched from the committed real
+    # capture until that exemption exists. Every run and every PR says "cache".
+    source: cache
     schema: schemas/changelog-entry.json
     # Substring-matched against entry title/body and against the vendor's own
     # `changed`/`affected` symbol lists. See specs/scraper-pipeline.md §3.
     symbols: [charges.create, payment_intents, Charge#create, PaymentIntent#create]
     files: [demo-app/src/payments.ts]
 
-  # A second vendor is cut #1 in docs/PLAN.md. Do not add one until the loop is green.
+  cloudflare:
+    url: https://developers.cloudflare.com/changelog/
+    schema: schemas/changelog-entry.json
+    # The receipt page is cached at the edge, so demo-app purges it after a payment.
+    symbols: [purge_cache, /client/v4/zones, Cache Rules, cache reserve]
+    files: [demo-app/src/cdn.ts]
+
+  # Note on provenance: Bright Data's compliance policy blocks docs.stripe.com
+  # (policy_20050 — the domain needs KYC), so Stripe is watched from a committed real
+  # capture while Cloudflare is scraped live. `pnpm check` prints which is which, and so
+  # does every PR body. See NOTES.md 2026-08-30.

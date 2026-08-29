@@ -14,6 +14,16 @@ export function isDemoMode(env = process.env): boolean {
   return env.DEMO_MODE === "1";
 }
 
-export function createScraperClient(env = process.env): ScraperClient {
-  return isDemoMode(env) ? new CachedScraperClient() : new BrightDataScraperClient();
+/**
+ * Pick the scraper for a target.
+ *
+ * Live by default. A vendor pinned to `cache` in targets.yaml, or DEMO_MODE=1 globally,
+ * replays its committed capture instead.
+ */
+export function createScraperClient(
+  target?: { source?: "live" | "cache" },
+  env = process.env,
+): ScraperClient {
+  const cached = isDemoMode(env) || target?.source === "cache";
+  return cached ? new CachedScraperClient() : new BrightDataScraperClient();
 }

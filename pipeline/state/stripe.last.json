@@ -1,6 +1,6 @@
 {
   "vendor": "stripe",
-  "lastCheck": "2026-08-29T19:54:25.452Z",
+  "lastCheck": "2026-08-29T20:52:58.135Z",
   "seen": [
     "2026-08-26::Adds a customer update deep link for billing portal sessions",
     "2026-08-26::Adds support for updating Connect parameters of an existing Payment Link",

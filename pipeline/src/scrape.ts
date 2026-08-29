@@ -38,7 +38,7 @@ export interface VendorRun {
 export async function scrapeVendor(vendor: string, options: ScrapeOptions = {}): Promise<VendorRun> {
   const target = await loadTarget(vendor);
   const spec = await loadSpec(vendor);
-  const client = options.client ?? createScraperClient();
+  const client = options.client ?? createScraperClient(target);
 
   const empty: VendorRun = {
     vendor, provenance: null, cachedHtmlPath: null,

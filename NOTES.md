@@ -117,3 +117,43 @@ so pointing it at the real session and approval routes is a one-file change.
 **Lesson:** An unknown marked VERIFY still needs someone to spend the sixty seconds. This one
 had been carried as a risk through a plan, a cut order and two commits, and it cost one
 command to answer.
+
+## 2026-08-30 — The sponsor's compliance policy blocked the vendor we designed around
+
+**Where:** `pipeline/src/clients/brightdata.ts`, `agent/targets.yaml`
+**Symptom:** With a working Bright Data key and zone, `pnpm check` reported
+`SCRAPE FAILED after 3 attempts`. The raw request returned **HTTP 200 with a zero-byte body**
+after 66 seconds — three times, once per retry. A test fetch of
+`https://geo.brdtest.com/welcome.txt` worked instantly, and so did `https://example.com`, so
+the credentials were fine.
+**Cause:** `format: "raw"` gives you the page or nothing, and "nothing" here was not a timeout.
+Re-requesting with `format: "json"` returned the envelope, and the envelope had the answer:
+
+```
+status_code: 403
+proxy-status: error="destination_ip_prohibited";
+  details="policy_20050: Forbidden: target site requires special permission…
+           not permitted by our compliance policy"
+```
+
+Bright Data will not scrape `docs.stripe.com` without KYC. Stripe is a payments company; in
+hindsight, obviously a restricted category. The project had been designed around it for two
+days.
+
+**Fix:** Added a per-vendor `source: live | cache` to `agent/targets.yaml`. Stripe is pinned to
+its committed real capture with the policy ID in a comment, and **Cloudflare's changelog was
+added as a genuinely live vendor** — Bright Data permits it, it is ordinary server-rendered
+markup, and it gave the `css` extraction strategy its first real-world case (25 entries,
+25 valid, relative permalinks resolved). `demo-app` gained a Cloudflare cache-purge call, so
+the second vendor maps to real code rather than being decorative. Every run and every PR body
+prints which vendor was live and which came from cache.
+
+**Lesson:** Two things. First, an opaque success is worse than an error — `format: "raw"`
+returning 200-and-empty cost far more time than a 403 would have, and the fix was to ask the
+same API for a shape that could carry an error. When a client can choose its response
+envelope, choose the one that can tell you bad news.
+
+Second: check what your data provider is *allowed* to fetch before designing around a source.
+I verified the endpoint, the auth, the request shape and the parse strategy against the real
+page — everything except whether the vendor would serve it at all. That check costs one
+request and I did it on day two instead of day one.

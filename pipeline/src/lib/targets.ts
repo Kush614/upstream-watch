@@ -35,12 +35,18 @@ export async function loadTargets(file = TARGETS_FILE): Promise<Targets> {
     if (typeof v?.url !== "string") {
       throw new ConfigError(`targets.yaml: "${vendor}.url" is required`, { vendor });
     }
+    const source = v.source;
+    if (source !== undefined && source !== "live" && source !== "cache") {
+      throw new ConfigError(`targets.yaml: "${vendor}.source" must be live or cache`, { vendor, source });
+    }
+
     return {
       vendor,
       url: v.url,
       schema: typeof v.schema === "string" ? v.schema : "schemas/changelog-entry.json",
       symbols: strings(v.symbols, "symbols", vendor),
       files: strings(v.files, "files", vendor),
+      ...(source ? { source } : {}),
     };
   });
 

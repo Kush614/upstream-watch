@@ -55,6 +55,19 @@ vendors:
         url: "https://docs.stripe.com/changelog/{train}#{slug}"
         breaking: "breaking"                 # Stripe publishes this itself
     breaking_hint: ["deprecat", "removed", "breaking", "no longer"]
+
+  cloudflare:
+    url: https://developers.cloudflare.com/changelog/
+    # Ordinary server-rendered markup, so plain CSS selectors work. This is the
+    # `css` strategy's real-world case, and the vendor Bright Data actually permits.
+    strategy: css
+    entry_selector: "article.nb-cl-entry"
+    fields:
+      date:  { selector: "time", attr: "datetime" }
+      title: "h2"
+      body:  ".docs-content"
+      url:   { selector: "a.nb-cl-title-link", attr: "href" }
+    breaking_hint: ["deprecat", "removed", "breaking", "no longer", "end of life", "sunset"]
 ```
 
 ### Why `strategy` exists

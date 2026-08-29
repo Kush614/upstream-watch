@@ -106,6 +106,15 @@ export interface VendorTarget {
   schema: string;
   symbols: string[];
   files: string[];
+  /**
+   * Where this vendor's HTML comes from.
+   *
+   * Defaults to live. `cache` pins a vendor to its committed capture — needed when a
+   * scraper cannot legally reach the page at all, as with Bright Data's compliance block
+   * on docs.stripe.com. Pinning it in config beats a global flag, because the two vendors
+   * genuinely differ and every run should say so.
+   */
+  source?: "live" | "cache";
 }
 
 export interface Targets {

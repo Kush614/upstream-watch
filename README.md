@@ -124,7 +124,7 @@ pnpm demo:feed && pnpm ui                   # three panels on :5173
 
 | Step | State |
 | --- | --- |
-| Detect (Bright Data → parse → diff → relevance) | ✅ live, 81 tests |
+| Detect — Cloudflare **live via Bright Data**, Stripe from a committed real capture | ✅ 116 tests |
 | Self-repair (mismatch → context → validated candidate) | ✅ working; the model proposes the spec |
 | PR body + approval gate | ✅ implemented and tested |
 | Approval card / Doing / Did panels | ✅ built; wire `adapter.ts` to the harness |
