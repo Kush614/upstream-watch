@@ -420,3 +420,33 @@ them. The error told me exactly what was wrong and where, and wrote itself down 
 asked. Failure documentation is cheap to add while writing the failure and expensive to
 reconstruct afterwards.
 
+
+## 2026-08-30 — The proof was showing a request no commit ever made
+
+**Where:** `scripts/proof-runner.ts` (now `scripts/proof/`)
+**Symptom:** None visible — the columns looked right. Qodo found it by reading.
+**Cause:** The runner *composed* the request it displayed (`{model, input, store}`) and sent
+that itself, rather than capturing what the checked-out commit actually sent during its test
+run. The screen would have attributed a request body and a status to a commit that may never
+have produced them. On a page whose entire claim is "everything here is real except the
+labelled emulation", that is the one thing that must not be approximated.
+**Fix:** The emulated vendor now records every request it receives, and the column reports the
+last one from that side's own test run. If a commit never called the vendor, the run raises
+rather than inventing a receipt.
+
+Two more from the same review, both the same shape:
+
+- A test run producing no vitest summary was reported as `{passed: 0, failed: 0}` — a broken
+  run dressed as a clean one. It now raises: a run that did not happen has not failed zero
+  tests.
+- Copying today's tests into the historical worktree swallowed its errors. Had `cp` failed,
+  the proof would have graded old code against old expectations and presented that as the
+  guarantee. It now raises and says exactly that.
+
+**Lesson:** Every one of these is the same bug wearing different clothes, and it is now the
+fourth time this review has caught it in this project: **an absent or failed result rendered
+as a good one.** `passed !== false`, `testsPassed ? true : null`, a green tick over a failing
+suite, and now a fabricated request. The pattern is not carelessness about error handling —
+it is that the happy path is the one you write first and the one you look at, and every
+shortcut in it defaults toward "fine". Where a human reads the output before doing something
+irreversible, absence has to render as absence.

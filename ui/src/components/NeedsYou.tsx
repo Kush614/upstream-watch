@@ -24,10 +24,16 @@ export function NeedsYou({ detail, onApprove, onReject, busy }: {
     <section className="animate-slideIn rounded-xl border border-accent/60 bg-panel p-5 sm:p-6">
       <p className="text-[17px] leading-relaxed">
         <span className="font-semibold capitalize">{vendor}</span> is removing something your app
-        uses. I prepared a fix and tested it.
+        uses. I prepared a fix and {tests && tests.failed > 0 ? "some checks did not pass" : "tested it"}.
         {tests && (
-          <span className="ml-2 whitespace-nowrap rounded-full border border-ok px-2.5 py-0.5 text-[13px] text-ok">
-            ✓ {tests.passed}/{tests.passed + tests.failed}
+          /* Colour follows the result. A green tick over a failing run, directly above the
+             only irreversible button on the page, is the worst thing this card could do. */
+          <span
+            className={`ml-2 whitespace-nowrap rounded-full border px-2.5 py-0.5 text-[13px] ${
+              tests.failed > 0 ? "border-bad text-bad" : "border-ok text-ok"
+            }`}
+          >
+            {tests.failed > 0 ? "✕" : "✓"} {tests.passed}/{tests.passed + tests.failed}
           </span>
         )}
       </p>

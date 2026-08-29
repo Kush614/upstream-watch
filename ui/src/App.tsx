@@ -22,6 +22,7 @@ export function App() {
   const [emulatedDate, setEmulatedDate] = useState("");
   const [running, setRunning] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [sound, setSound] = useState(false);
   const play = useSound(sound);
   const lastPhase = useRef<Phase>("idle");
@@ -55,6 +56,8 @@ export function App() {
 
   const runBoth = useCallback(async () => {
     setRunning(true);
+    setError(null);
+
     const consume = async (side: "before" | "after") => {
       const stream = await adapter.run(side);
       for await (const chunk of stream) {
@@ -64,12 +67,25 @@ export function App() {
         }
       }
     };
-    await Promise.all([consume("before"), consume("after")]);
-    setRunning(false);
+
+    try {
+      await Promise.all([consume("before"), consume("after")]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      // Without this a single failed fetch leaves the button disabled and reading
+      // "Running…" for the rest of the session, with nothing said about why.
+      setRunning(false);
+    }
   }, []);
 
   const changeDate = useCallback(async (date: string) => {
     setEmulatedDate(date);
+    // Results belong to the date they were produced for. Showing an outage beside a
+    // pre-shutdown slider — or a green column past it — is worse than showing nothing.
+    setBefore(undefined);
+    setAfter(undefined);
+
     await adapter.setEmulatedDate(date);
     const last = await adapter.loadLastRun();
     setBefore(last.before);
@@ -79,15 +95,30 @@ export function App() {
   const decide = useCallback(async (kind: "approve" | "reject", reason?: string) => {
     if (!detail.approvalId) return;
     setBusy(true);
-    if (kind === "approve") await adapter.approve(detail.approvalId);
-    else await adapter.reject(detail.approvalId, reason ?? "");
-    setBusy(false);
+    setError(null);
+
+    try {
+      if (kind === "approve") await adapter.approve(detail.approvalId);
+      else await adapter.reject(detail.approvalId, reason ?? "");
+    } catch (e) {
+      // A decision that silently does nothing is the worst outcome here: the person
+      // believes they approved a merge that never happened.
+      setError(`That did not go through — ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setBusy(false);
+    }
   }, [detail.approvalId]);
 
   const vendorName = detail.vendor ?? "A service";
 
   return (
     <div data-phase={phase} className="mx-auto min-h-full max-w-[1180px] px-4 py-6 sm:px-6 sm:py-8">
+      {error && (
+        <p className="mb-4 rounded-lg border border-bad bg-bad/10 px-3.5 py-2.5 text-[13.5px] text-bad" role="alert">
+          {error}
+        </p>
+      )}
+
       <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-[15px] font-semibold">Upstream Watch</h2>

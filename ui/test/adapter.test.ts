@@ -118,3 +118,32 @@ describe("MockAdapter", () => {
     expect(phase).toBe("merged");
   });
 });
+
+describe("regressions the review caught", () => {
+  it("does not call a session merged when the newest change is still open", async () => {
+    // "Any merged item" announced success while linking an older merge, with a later
+    // change still awaiting a human.
+    const { toUiEventForTest } = await import("../src/adapter.real.ts");
+    const state = {
+      connected: true, source: "trueforge" as const, vendors: [], steps: [], pending: [],
+      done: [
+        { id: "a", vendor: "openai", title: "old", prUrl: "u", prNumber: 5, branch: "", status: "merged" as const, at: "" },
+        { id: "b", vendor: "openai", title: "new", prUrl: "u", prNumber: 6, branch: "", status: "open" as const, at: "" },
+      ],
+      summary: { lastCheck: null, eventsSeen: 0, prsOpened: 2, prsMerged: 1, pendingApprovals: 0 },
+    };
+
+    expect(toUiEventForTest(state).phase).not.toBe("merged");
+  });
+
+  it("calls it merged when the newest change is the merged one", async () => {
+    const { toUiEventForTest } = await import("../src/adapter.real.ts");
+    const state = {
+      connected: true, source: "trueforge" as const, vendors: [], steps: [], pending: [],
+      done: [{ id: "b", vendor: "openai", title: "new", prUrl: "u", prNumber: 6, branch: "", status: "merged" as const, at: "" }],
+      summary: { lastCheck: null, eventsSeen: 0, prsOpened: 1, prsMerged: 1, pendingApprovals: 0 },
+    };
+
+    expect(toUiEventForTest(state).phase).toBe("merged");
+  });
+});

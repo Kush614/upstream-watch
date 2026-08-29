@@ -18,7 +18,6 @@ import type { DoneItem, PendingApproval, SessionState, Step, StepKind } from "..
  *     against the event index before there is anything to show a human.
  */
 
-const API = "/api/v1";
 const LOCAL_FEED = "/session.json";
 
 const EMPTY: SessionState = {
@@ -56,6 +55,9 @@ interface McpCall {
   input: Record<string, unknown>;
 }
 
+import { fetchEvents, fetchSessions, postDecision } from "./trueforge-client.ts";
+
+/** Only the local frozen feed is fetched here; everything live goes through the client. */
 async function getJson<T>(url: string, signal?: AbortSignal): Promise<T | null> {
   try {
     const res = await fetch(url, { signal, headers: { accept: "application/json" } });
@@ -393,7 +395,7 @@ export interface SessionRef {
 
 export async function listSessions(signal?: AbortSignal): Promise<SessionRef[]> {
   const raw = unwrapList<{ id?: string; title?: string | null; created_at?: string }>(
-    await getJson(`${API}/sessions`, signal),
+    await fetchSessions(signal).catch(() => null),
   );
 
   return raw
@@ -412,7 +414,7 @@ export async function loadSession(sessionId?: string, signal?: AbortSignal): Pro
     return local ? { ...EMPTY, ...local } : EMPTY;
   }
 
-  const raw = await getJson<unknown>(`${API}/sessions/${id}/events`, signal);
+  const raw = await fetchEvents(id, signal).catch(() => null);
   if (raw === null) {
     return { ...EMPTY, connected: false, source: "trueforge", error: "session found, but its events could not be read — approvals may be hidden" };
   }
@@ -452,28 +454,16 @@ export async function decide(
   approvalId: string,
   decision: "approve" | "reject",
   reason?: string,
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<void> {
   const [threadId, toolCallId] = approvalId.split("::");
-  if (!threadId || !toolCallId) return { ok: false, error: "malformed approval id" };
+  if (!threadId || !toolCallId) throw new Error(`malformed approval id: ${approvalId}`);
 
-  try {
-    const res = await fetch(`${API}/sessions/${sessionId}/turns`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        stream: false,
-        input: [{
-          type: "user.tool_approval",
-          thread_id: threadId,
-          tool_call_id: toolCallId,
-          approval: decision === "approve" ? { status: "allow" } : { status: "deny", reason },
-        }],
-      }),
-    });
-    return res.ok ? { ok: true } : { ok: false, error: `${res.status} ${res.statusText}` };
-  } catch (error) {
-    return { ok: false, error: String(error) };
-  }
+  await postDecision(
+    sessionId,
+    threadId,
+    toolCallId,
+    decision === "approve" ? { status: "allow" } : { status: "deny", reason },
+  );
 }
 
 export function subscribe(

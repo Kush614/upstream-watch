@@ -7,6 +7,16 @@
  */
 
 import type { Adapter, Phase, RunChunk, RunResult, UiEvent } from "./adapter.ts";
+
+/** The proof runner is a separate service; its failures should be distinguishable. */
+export class ProofRunnerError extends Error {
+  readonly status?: number;
+  constructor(message: string, status?: number) {
+    super(message);
+    this.name = "ProofRunnerError";
+    this.status = status;
+  }
+}
 import { loadSession, decide as decideOnApproval } from "./lib/trueforge-events.ts";
 import type { SessionState } from "./types.ts";
 
@@ -19,7 +29,9 @@ const POLL_MS = 2500;
 /** What the watch is doing, said the way a person would say it. */
 function phaseOf(state: SessionState): Phase {
   if (state.pending.length > 0) return "awaiting_approval";
-  if (state.done.some((d) => d.status === "merged")) return "merged";
+  // The NEWEST pull request decides. "Any merged item" announces success while linking an
+  // older merge, when a later change is still open.
+  if (state.done.at(-1)?.status === "merged") return "merged";
   if (state.steps.some((s) => s.kind === "repair")) return "repairing";
   if (state.steps.some((s) => s.kind === "sandbox" || s.kind === "subagent")) return "testing";
   if (state.done.length > 0 || state.steps.some((s) => s.kind === "pr")) return "change_found";
@@ -87,6 +99,9 @@ function toUiEvent(state: SessionState): UiEvent {
   };
 }
 
+/** Exposed for tests: the mapping is where the subtle mistakes live. */
+export const toUiEventForTest = toUiEvent;
+
 /* ──────────────────────────── the adapter ──────────────────────────────── */
 
 class RealAdapter implements Adapter {
@@ -107,8 +122,16 @@ class RealAdapter implements Adapter {
         this.#sessionId = state.sessionId ?? this.#sessionId;
         const event = toUiEvent(state);
 
-        // Only speak when something actually changed.
-        if (!this.#last || this.#last.phase !== event.phase || this.#last.message !== event.message) {
+        // Speak when anything the screen renders changes. Comparing only phase and message
+        // left the approval card frozen on incomplete detail — the diff, tests and PR arrive
+        // while the phase stays awaiting_approval.
+        const changed =
+          !this.#last ||
+          this.#last.phase !== event.phase ||
+          this.#last.message !== event.message ||
+          JSON.stringify(this.#last.detail) !== JSON.stringify(event.detail);
+
+        if (changed) {
           this.#last = event;
           cb(event);
         }
@@ -154,7 +177,12 @@ class RealAdapter implements Adapter {
   /** Streams `request → response → tests` from the proof runner as it happens. */
   async run(side: "before" | "after"): Promise<AsyncIterable<RunChunk>> {
     const res = await fetch(`${RUNNER}/run?side=${side}`, { method: "POST" });
-    if (!res.ok || !res.body) throw new Error(`proof runner: ${res.status}`);
+    if (!res.ok || !res.body) {
+      throw new ProofRunnerError(
+        `The proof runner did not answer (${res.status}). Start it with \`pnpm proof\`.`,
+        res.status,
+      );
+    }
 
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
@@ -184,7 +212,16 @@ class RealAdapter implements Adapter {
       const res = await fetch(`${RUNNER}/last`);
       if (res.ok) return (await res.json()) as { before?: RunResult; after?: RunResult; emulatedDate: string };
     } catch {
-      /* runner not started */
+      /* runner not started — the receipt it last wrote still stands */
+    }
+
+    // The runner persists every result to ui/public/last-run.json. Reading it means a
+    // restarted runner, or none at all, still shows the proof that was produced.
+    try {
+      const res = await fetch("/last-run.json");
+      if (res.ok) return (await res.json()) as { before?: RunResult; after?: RunResult; emulatedDate: string };
+    } catch {
+      /* nothing has ever been run */
     }
     return { emulatedDate: new Date().toISOString().slice(0, 10) };
   }
