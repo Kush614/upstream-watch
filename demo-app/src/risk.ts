@@ -9,7 +9,7 @@
 const OPENAI_API = process.env.OPENAI_API_BASE ?? "https://api.openai.com/v1";
 
 /** Pinned deliberately. OpenAI's deprecations page lists a shutdown date for this. */
-export const RISK_MODEL = "gpt-5-mini-2025-08-07";
+export const RISK_MODEL = "gpt-5.6-terra";
 
 export interface RiskRequest {
   amountCents: number;
