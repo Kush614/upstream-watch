@@ -18,7 +18,9 @@
     "demo:restore-page": "node --experimental-strip-types scripts/break-page.ts --restore",
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",
-    "demo:rewind": "node --experimental-strip-types scripts/rewind-state.ts"
+    "demo:rewind": "node --experimental-strip-types scripts/rewind-state.ts",
+    "demo:feed": "node --experimental-strip-types scripts/build-feed.ts",
+    "ui": "pnpm --filter ui dev"
   },
   "devDependencies": {
     "typescript": "^5.6.0",

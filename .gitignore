@@ -11,3 +11,6 @@ coverage/
 # Rolling scrape snapshots (timestamped). current/last-good/restructured are committed.
 agent/fixtures/html/*/20*.html
 pipeline/state/*.repair-context.json
+ui/dist/
+pipeline/state/.feed-*.json
+pipeline/state/.test-*.json
