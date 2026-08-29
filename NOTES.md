@@ -297,3 +297,37 @@ letter. It took a third data source to expose it. The tests now pin the exact ca
 → gpt-5.6-terra`. Stripe says "this is deprecated" and leaves you to work out the migration;
 OpenAI hands you the target, so the patch is checkable rather than inferred. The model
 `demo-app/src/risk.ts` is pinned to shuts down 2026-12-11.
+
+## 2026-08-30 — Three ways the same run failed, none of them the code
+
+Running the agent against OpenAI took four attempts. Each failed differently, and only the
+first was a design problem.
+
+**1. The watcher paged 40 kB through its own context.** OpenAI's deprecations page yields 86
+new entries, nearly all models this repo never calls. The watcher prompt says "return ONLY a
+JSON array of ChangeEvent objects", so the subagent dutifully read the whole array back in
+chunks to report that two of them mattered. Fixed with `--relevant`: actionable events plus a
+count of the rest, 40328 bytes down to 1492.
+
+**2. The same input gave two different answers.** One run's watcher improvised a `DEMO_MODE=1`
+retry when the live scrape failed for missing credentials; the next declared the vendor broken
+and patched nothing. The sandbox clones this repo from GitHub and `.env` is gitignored, so
+credentials are simply absent there — and nothing said what to do about it, leaving the model
+to invent a policy per run. Now `createScraperClient` treats "no credentials" the same as
+DEMO_MODE, and `provenance` still reports `cache` everywhere.
+
+**3. Daytona ran out of disk.** `Sandbox initialization failed: Total disk limit exceeded.
+Maximum allowed: 30GiB.` Each sandbox reserves 3 GiB and TrueForge's default
+`auto_delete_interval_in_minutes` is 7200 — five days. Ten runs filled the quota exactly.
+Deleted nine via Daytona's API and dropped retention to 30 minutes.
+
+**4. And then I did it to myself.** After all that the agent reported "no changes found" — and
+it was right. I had run plain `pnpm check` to read one line of mode output, which recorded all
+86 entries as seen, and committed that state. The agent cloned a branch where nothing was new.
+`--no-persist` exists precisely to prevent this; I built it, documented it, and then did not
+use it.
+
+**Lesson:** Only one of the four was a bug in the product. The others were an agent left to
+improvise a policy, a quota nobody was watching, and me not following my own instruction. The
+fix for the first two was to *encode* the decision rather than hope for it — a prompt that says
+"do the right thing" is not a specification.
