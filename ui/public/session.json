@@ -1,129 +1,458 @@
 {
   "source": "local",
   "connected": false,
-  "summary": {
-    "lastCheck": "2026-08-29T22:26:24.150Z",
-    "eventsSeen": 4,
-    "prsOpened": 1,
-    "prsMerged": 0,
-    "pendingApprovals": 1
-  },
+  "capturedAt": "2026-08-29T22:54:42.824Z",
+  "capturedFrom": "01m17sa9bk6f5z9mn60cms38h6",
+  "sessionTitle": "Merge pull request #6 in Kush614/upstream-watch. D",
+  "vendors": [
+    {
+      "vendor": "openai",
+      "provenance": "cache",
+      "entries": 0
+    }
+  ],
   "steps": [
     {
-      "id": "s1",
-      "kind": "skill",
-      "label": "skill loaded",
-      "at": "2026-08-29T22:25:32.150Z",
-      "status": "ok",
-      "detail": "brightdata-changelog-scraper"
-    },
-    {
-      "id": "s2",
-      "kind": "scrape",
-      "label": "scrape stripe",
-      "at": "2026-08-29T22:25:36.150Z",
-      "status": "ok",
-      "detail": "40 entries · cache"
-    },
-    {
-      "id": "s3",
-      "kind": "diff",
-      "label": "diff: 4 changes",
-      "at": "2026-08-29T22:25:40.150Z",
-      "status": "ok",
-      "detail": "21 new since last run"
-    },
-    {
-      "id": "s4",
-      "kind": "subagent",
-      "label": "subagent: patcher",
-      "at": "2026-08-29T22:25:46.150Z",
-      "status": "ok"
-    },
-    {
-      "id": "s5",
+      "id": "call_yx7pBDVLWjTLhqdTgJIW9fZx",
       "kind": "sandbox",
-      "label": "sandbox provisioned",
-      "at": "2026-08-29T22:25:48.150Z",
-      "status": "ok",
-      "detail": "patch + test run in isolation"
-    },
-    {
-      "id": "s6",
-      "kind": "tests",
-      "label": "tests: pass",
-      "at": "2026-08-29T22:26:12.150Z",
-      "status": "ok",
-      "detail": "14 passed"
-    },
-    {
-      "id": "s7",
-      "kind": "pr",
-      "label": "pr opened",
-      "at": "2026-08-29T22:26:18.150Z",
+      "label": "exec: Check whether the scrape reported a schema mismatch.",
+      "at": "2026-08-29T21:56:12.302Z",
       "status": "ok"
     },
     {
-      "id": "s8",
-      "kind": "approval",
-      "label": "waiting for approval to merge",
-      "at": "2026-08-29T22:26:20.150Z",
-      "status": "warn"
+      "id": "call_RsLfMCVmsZfBoG50OMOQ0l56",
+      "kind": "sandbox",
+      "label": "exec: Confirm cached OpenAI HTML files exist without displaying th",
+      "at": "2026-08-29T21:56:12.302Z",
+      "status": "ok"
+    },
+    {
+      "id": "call_OaMg522wsTUeP5FX5uHF4Ocj",
+      "kind": "sandbox",
+      "label": "exec: Inspect the beginning of the saved scrape output to locate t",
+      "at": "2026-08-29T21:56:15.258Z",
+      "status": "ok"
+    },
+    {
+      "id": "call_2Va9KdOFPvqjnzFUwMNZSphw",
+      "kind": "sandbox",
+      "label": "exec: Extract the JSON payload from the scrape output for validati",
+      "at": "2026-08-29T21:56:17.955Z",
+      "status": "ok"
+    },
+    {
+      "id": "call_6fgMMJmPknVd00XDDPClyuCq",
+      "kind": "sandbox",
+      "label": "exec: Read the validated scrape JSON payload to return it exactly.",
+      "at": "2026-08-29T21:56:20.712Z",
+      "status": "ok"
+    },
+    {
+      "id": "01m17rc7syavsprhbh6kdf5eza",
+      "kind": "subagent",
+      "label": "subagent: watcher-openai",
+      "at": "2026-08-29T21:56:25.022Z",
+      "status": "ok"
+    },
+    {
+      "id": "call_zz0ZVkfAtIfYonOkO8kIHz40",
+      "kind": "subagent",
+      "label": "create_sub_agent",
+      "at": "2026-08-29T21:56:35.961Z",
+      "status": "ok"
+    },
+    {
+      "id": "01m17rcjg2e1xeznjpp9n9am7z",
+      "kind": "subagent",
+      "label": "subagent: patcher-openai-gpt5-mini",
+      "at": "2026-08-29T21:56:35.971Z",
+      "status": "running"
+    },
+    {
+      "id": "call_Zo0kMK1gxBZ7J46Yfxw6YAbN",
+      "kind": "sandbox",
+      "label": "exec: Inspect repository status and target file",
+      "at": "2026-08-29T21:56:38.266Z",
+      "status": "ok"
+    },
+    {
+      "id": "call_fwHKYS8TWMO0ycyuEktfVzlg",
+      "kind": "sandbox",
+      "label": "exec: Inspect package scripts and tests mentioning the risk model",
+      "at": "2026-08-29T21:56:42.097Z",
+      "status": "ok"
+    },
+    {
+      "id": "call_AnCX54JuIRHinQr0JLLbmUnC",
+      "kind": "sandbox",
+      "label": "exec: Show available npm scripts",
+      "at": "2026-08-29T21:56:44.299Z",
+      "status": "ok"
+    },
+    {
+      "id": "call_wJvg7NOw0i3ROL0kX1aA6VxD",
+      "kind": "sandbox",
+      "label": "exec: Find test scripts in workspace packages",
+      "at": "2026-08-29T21:56:46.338Z",
+      "status": "ok"
+    },
+    {
+      "id": "call_5bijY7L5wnqD1uajzzfNBTIR",
+      "kind": "sandbox",
+      "label": "exec: Find test scripts in workspace packages",
+      "at": "2026-08-29T21:56:48.462Z",
+      "status": "ok"
+    },
+    {
+      "id": "call_H7BySmKrbLgWYZhTOLd9z1FT",
+      "kind": "sandbox",
+      "label": "exec: Update the deprecated OpenAI risk model to the recommended r",
+      "at": "2026-08-29T21:56:50.946Z",
+      "status": "ok"
+    },
+    {
+      "id": "call_l9J0vyswKUz8ZEvoluVXX8Ga",
+      "kind": "sandbox",
+      "label": "exec: Run demo app typecheck and tests for the changed code",
+      "at": "2026-08-29T21:56:53.546Z",
+      "status": "ok"
+    },
+    {
+      "id": "call_0jqEaSYPHm3ktZ5SvkMxeYPx",
+      "kind": "sandbox",
+      "label": "exec: Inspect the related vendor test before updating its pinned m",
+      "at": "2026-08-29T21:57:01.760Z",
+      "status": "ok"
+    },
+    {
+      "id": "call_qOIf8vPC5pz1fMgHuD40OHkS",
+      "kind": "sandbox",
+      "label": "exec: Update the related test expectation for the replacement mode",
+      "at": "2026-08-29T21:57:03.591Z",
+      "status": "ok"
+    },
+    {
+      "id": "call_tgYaFa3YKAaTxf0vIeOHAh5S",
+      "kind": "sandbox",
+      "label": "exec: Re-run demo app typecheck and tests after the model update",
+      "at": "2026-08-29T21:57:05.233Z",
+      "status": "ok"
+    },
+    {
+      "id": "call_f4NM0ioz04wEqhU4YeN365Bj",
+      "kind": "sandbox",
+      "label": "exec: Collect the final patch diff for reporting",
+      "at": "2026-08-29T21:57:13.223Z",
+      "status": "ok"
+    },
+    {
+      "id": "01m17rdtd34w82a54p59d3984k",
+      "kind": "subagent",
+      "label": "subagent: patcher-openai-gpt5-mini",
+      "at": "2026-08-29T21:57:16.835Z",
+      "status": "ok"
+    },
+    {
+      "id": "call_jOYkmbYnwbLa7l7Px4rfC6JM",
+      "kind": "skill",
+      "label": "list_tools",
+      "at": "2026-08-29T21:57:20.289Z",
+      "status": "ok"
+    },
+    {
+      "id": "call_xj8fYE58fpSqh5luFDTyOmmu",
+      "kind": "skill",
+      "label": "get_tool_info",
+      "at": "2026-08-29T21:57:24.332Z",
+      "status": "ok"
+    },
+    {
+      "id": "call_V5XGLobdNAlTrg6nsOV0VTgW",
+      "kind": "skill",
+      "label": "get_tool_info",
+      "at": "2026-08-29T21:57:24.332Z",
+      "status": "ok"
+    },
+    {
+      "id": "call_edKtO2jO5F89iw2bpakjEOHZ",
+      "kind": "skill",
+      "label": "get_tool_info",
+      "at": "2026-08-29T21:57:24.332Z",
+      "status": "ok"
+    },
+    {
+      "id": "call_x7joA02wDNrqDZBsuiBopWXq",
+      "kind": "sandbox",
+      "label": "exec: Read the repository PR body template.",
+      "at": "2026-08-29T21:57:24.332Z",
+      "status": "ok"
+    },
+    {
+      "id": "call_AvUiQXQD6QPSnzSPOBnqejMC",
+      "kind": "sandbox",
+      "label": "exec: Check the current patch status after the first patcher.",
+      "at": "2026-08-29T21:57:24.332Z",
+      "status": "ok"
+    },
+    {
+      "id": "call_xKlipsF4ZuE8WcbgrfaJbZSf",
+      "kind": "skill",
+      "label": "get_current_datetime",
+      "at": "2026-08-29T21:57:28.929Z",
+      "status": "ok"
+    },
+    {
+      "id": "call_CwwAouti70fFMIs9qqkYScbm",
+      "kind": "skill",
+      "label": "github: create_branch",
+      "at": "2026-08-29T21:57:32.450Z",
+      "status": "ok"
+    },
+    {
+      "id": "call_hChNcBOXtUYuzRkxovDFV7fl",
+      "kind": "sandbox",
+      "label": "exec: Collect the patched file contents for the OpenAI model PR.",
+      "at": "2026-08-29T21:57:35.426Z",
+      "status": "ok"
+    },
+    {
+      "id": "call_tFfdq1eIMbs7tbAoQiqrZSkh",
+      "kind": "skill",
+      "label": "github: push_files",
+      "at": "2026-08-29T21:57:42.883Z",
+      "status": "ok"
+    },
+    {
+      "id": "call_NlsISg7K4c4liPIjeqaemIUD",
+      "kind": "pr",
+      "label": "github: create_pull_request",
+      "at": "2026-08-29T21:57:47.760Z",
+      "status": "ok"
+    },
+    {
+      "id": "call_MXerRqFEXCTvOWXMPEs31cW3",
+      "kind": "sandbox",
+      "label": "exec: Reset the working tree so the next event patch is isolated.",
+      "at": "2026-08-29T21:57:52.295Z",
+      "status": "ok"
+    },
+    {
+      "id": "call_uQeYf77gJHyjtZrPBaD5nO7I",
+      "kind": "subagent",
+      "label": "create_sub_agent",
+      "at": "2026-08-29T21:57:55.569Z",
+      "status": "ok"
+    },
+    {
+      "id": "01m17rf07skpa54ddzrmv3e5xd",
+      "kind": "subagent",
+      "label": "subagent: patcher-openai-prompts-api",
+      "at": "2026-08-29T21:57:55.577Z",
+      "status": "running"
+    },
+    {
+      "id": "call_q8VJYACQTrMfr2mebKkPjAiA",
+      "kind": "sandbox",
+      "label": "exec: Inspect repository status and files relevant to requested ch",
+      "at": "2026-08-29T21:57:57.811Z",
+      "status": "ok"
+    },
+    {
+      "id": "call_Ghc11n4G3iaF1a7kSONjHGCO",
+      "kind": "sandbox",
+      "label": "exec: Search for deprecated prompt API usage and related tests.",
+      "at": "2026-08-29T21:58:00.650Z",
+      "status": "ok"
+    },
+    {
+      "id": "call_TuZlnTKhAGRJJlxMvX4VYWAZ",
+      "kind": "sandbox",
+      "label": "exec: Search source and test files for deprecated prompt API usage",
+      "at": "2026-08-29T21:58:03.970Z",
+      "status": "ok"
+    },
+    {
+      "id": "call_6EdLc9IYurOA0L3QwWLw9yC4",
+      "kind": "sandbox",
+      "label": "exec: Inspect project scripts and relevant tests before patching.",
+      "at": "2026-08-29T21:58:09.025Z",
+      "status": "ok"
+    },
+    {
+      "id": "call_UlUlk15KKJAJNeXojFh7T2P2",
+      "kind": "sandbox",
+      "label": "exec: Inspect demo-app source for the OpenAI integration context.",
+      "at": "2026-08-29T21:58:13.317Z",
+      "status": "ok"
+    },
+    {
+      "id": "call_1tyBtdnirbwfPxClltrQYKKb",
+      "kind": "sandbox",
+      "label": "exec: Patch the OpenAI risk call to use the non-deprecated Respons",
+      "at": "2026-08-29T21:58:21.905Z",
+      "status": "ok"
+    },
+    {
+      "id": "call_1U0a90QHo5QwjsEhpM1Wj1v2",
+      "kind": "sandbox",
+      "label": "exec: Run the demo app test suite for the patched OpenAI risk code",
+      "at": "2026-08-29T21:58:24.280Z",
+      "status": "ok"
+    },
+    {
+      "id": "call_gvKgxTI5eHA5vbWCoeCv50rT",
+      "kind": "sandbox",
+      "label": "exec: Run TypeScript checking for the patched demo app.",
+      "at": "2026-08-29T21:58:28.411Z",
+      "status": "ok"
+    },
+    {
+      "id": "call_oPstSgLDzy581GXnD6OupxYF",
+      "kind": "sandbox",
+      "label": "exec: Collect the unified diff for the requested patch.",
+      "at": "2026-08-29T21:58:33.182Z",
+      "status": "ok"
+    },
+    {
+      "id": "call_eXP8inGBQELgIXrOsX4x568M",
+      "kind": "sandbox",
+      "label": "exec: Tidy the response text helper for readability without changi",
+      "at": "2026-08-29T21:58:36.668Z",
+      "status": "ok"
+    },
+    {
+      "id": "call_yuDS7vmLJgUbWR2uhShAHfIm",
+      "kind": "sandbox",
+      "label": "exec: Re-run tests after the readability adjustment.",
+      "at": "2026-08-29T21:58:38.866Z",
+      "status": "ok"
+    },
+    {
+      "id": "call_0tVgb7YiMwgLOWwIsBG4fxIF",
+      "kind": "sandbox",
+      "label": "exec: Collect the final unified git diff for the response.",
+      "at": "2026-08-29T21:58:44.984Z",
+      "status": "ok"
+    },
+    {
+      "id": "01m17rgmjmkcbjtacbd5m15jng",
+      "kind": "subagent",
+      "label": "subagent: patcher-openai-prompts-api",
+      "at": "2026-08-29T21:58:49.173Z",
+      "status": "ok"
+    },
+    {
+      "id": "call_gM2ArPic402ZxspHIVAv6ABW",
+      "kind": "skill",
+      "label": "github: create_branch",
+      "at": "2026-08-29T21:58:51.793Z",
+      "status": "ok"
+    },
+    {
+      "id": "call_NdUuEA1rPf3gyRcPnSg7l8uZ",
+      "kind": "sandbox",
+      "label": "exec: Collect the patched file content for the OpenAI Responses AP",
+      "at": "2026-08-29T21:58:55.545Z",
+      "status": "ok"
+    },
+    {
+      "id": "call_31xqObb7ebzFhEFuUpwRcUKl",
+      "kind": "skill",
+      "label": "github: push_files",
+      "at": "2026-08-29T21:59:01.547Z",
+      "status": "ok"
+    },
+    {
+      "id": "call_JpFXvmQPhTM9bV88oY5yXlhN",
+      "kind": "pr",
+      "label": "github: create_pull_request",
+      "at": "2026-08-29T21:59:06.028Z",
+      "status": "ok"
+    },
+    {
+      "id": "call_sJYFemq8OJFzy0WX3jIFnVNJ",
+      "kind": "skill",
+      "label": "ask_user_question",
+      "at": "2026-08-29T21:59:11.003Z",
+      "status": "ok"
+    },
+    {
+      "id": "call_RVY9TlAGWjYZbGqG9fMrciPa",
+      "kind": "skill",
+      "label": "list_tools",
+      "at": "2026-08-29T22:12:53.219Z",
+      "status": "ok"
+    },
+    {
+      "id": "call_5i1viGgTcozan0TcrtO57t2Y",
+      "kind": "skill",
+      "label": "get_tool_info",
+      "at": "2026-08-29T22:12:56.105Z",
+      "status": "ok"
+    },
+    {
+      "id": "call_PZgiAAomUYX8o8wQxtRyQ1xl",
+      "kind": "merge",
+      "label": "github: merge_pull_request",
+      "at": "2026-08-29T22:12:58.849Z",
+      "status": "ok"
     }
   ],
   "pending": [
     {
-      "id": "apr_1",
-      "action": "merge_pull_request",
+      "id": "main::call_PZgiAAomUYX8o8wQxtRyQ1xl",
+      "action": "github: merge_pull_request",
       "entry": {
-        "vendor": "stripe",
-        "date": "2026-08-26",
-        "title": "Removes support for specifying payment method types in Payment Intents and Setup Intents",
-        "body": "Removes `payment_method_types` as a writable parameter from the [create](/api/payment_intents/create?api-version=2026-08-26.preview), [update](/api/payment_intents/update?api-version=2026-08-26.preview), and [confirm](/api/payment_intents/confirm?api-version=2026-08-26.preview) methods on Payment Intents, and from the [create](/api/setup_intents/create?api-version=2026-08-26.preview) and [update](/api/setup_intents/update?api-version=2026-08-26.preview) methods on Setup Intents. Passing `payment_method_types` now returns a 400 error with the code `payment_method_types_no_longer_supported`. The [PaymentIntent](/api/payment_intents/object?api-version=2026-08-26.preview#payment_intent_object-payment_method_types) and…",
-        "url": "https://docs.stripe.com/changelog/dahlia#removes-payment-method-types-parameter-from-payment-intents-setup-intents",
+        "vendor": "openai",
+        "date": "2026-12-11",
+        "title": "`gpt-5-mini-2025-08-07`",
+        "body": "Dec 11, 2026 `gpt-5-mini-2025-08-07` → `gpt-5.6-terra`",
+        "url": "https://platform.openai.com/docs/deprecations",
         "breaking": true,
-        "symbols": [
-          "payment_intents",
-          "PaymentIntent#create"
-        ]
+        "symbols": []
       },
+      "rationale": "Replaced the deprecated OpenAI risk model `gpt-5-mini-2025-08-07` with the recommended `gpt-5.6-terra` and updated the directly related pinned-model test expectation.",
       "files": [
-        "demo-app/src/payments.ts"
+        "demo-app/src/risk.ts",
+        "demo-app/test/vendors.test.ts"
       ],
-      "diff": "--- a/demo-app/src/payments.ts\n+++ b/demo-app/src/payments.ts\n@@ -25,3 +25,3 @@\n-  status: PaymentIntent[\"status\"];\n+  status: PaymentIntent[\"<vendor-recommended replacement>\"];\n   amount: number;",
+      "diff": "diff --git a/demo-app/src/risk.ts b/demo-app/src/risk.ts\nindex 050d969..00525b1 100644\n--- a/demo-app/src/risk.ts\n+++ b/demo-app/src/risk.ts\n@@ -9,7 +9,7 @@\n const OPENAI_API = process.env.OPENAI_API_BASE ?? \"https://api.openai.com/v1\";\n \n /** Pinned deliberately. OpenAI's deprecations page lists a shutdown date for this. */\n-export const RISK_MODEL = \"gpt-5-mini-2025-08-07\";\n+export const RISK_MODEL = \"gpt-5.6-terra\";\n \n export interface RiskRequest {\n   amountCents: number;\ndiff --git a/demo-app/test/vendors.test.ts b/demo-app/test/vendors.test.ts\nindex 330ec35..b3eeb17 100644\n--- a/demo-app/test/vendors.test.ts\n+++ b/demo-app/test/vendors.test.ts\n@@ -6,7 +6,7 @@ describe(\"OpenAI risk check\", () => {\n   it(\"uses the model this service is pinned to\", () => {\n     // Pinned deliberately: OpenAI publishes a shutdown date for this model, so when the\n     // deprecation lands this assertion is what has to change alongside the call.\n-    expect(RISK_MODEL).toBe(\"gpt-5-mini-2025-08-07\");\n+    expect(RISK_MODEL).toBe(\"gpt-5.6-terra\");\n   });\n \n   it(\"builds a prompt carrying the facts a reviewer needs\", () => {\n",
       "testsPassed": true,
-      "testOutput": "Test Files 1 passed (1)\n     Tests 14 passed (14)",
-      "prUrl": "https://github.com/Kush614/upstream-watch/pull/4",
-      "prNumber": 4
+      "testOutput": "export PATH=/opt/node/bin:$PATH; pnpm --filter demo-app typecheck && pnpm --filter demo-app test: passed (tsc --noEmit; vitest run: 3 files, 20 tests passed)",
+      "provenance": "cache",
+      "prUrl": "https://github.com/Kush614/upstream-watch/pull/6",
+      "prNumber": 6,
+      "prTitle": "Update OpenAI risk model for gpt-5-mini deprecation",
+      "prBranch": "upstream/openai-gpt5-mini-20260829"
     }
   ],
   "done": [
     {
-      "id": "d0",
-      "vendor": "stripe",
-      "title": "Adds support for disabling payout methods",
-      "prUrl": "https://docs.stripe.com/changelog/dahlia#disable-payout-methods",
-      "prNumber": 0,
+      "id": "pr0",
+      "vendor": "openai",
+      "title": "Move OpenAI risk call to Responses API",
+      "prUrl": "https://github.com/Kush614/upstream-watch/pull/7",
+      "prNumber": 7,
+      "branch": "upstream/openai-responses-api-20260829",
       "status": "open",
-      "at": "2026-08-26T00:00"
+      "at": "2026-08-29T21:59:06.028Z"
     },
     {
-      "id": "d1",
-      "vendor": "stripe",
-      "title": "Includes deleted prices in trial offer price data",
-      "prUrl": "https://docs.stripe.com/changelog/dahlia#trial-offers-return-deleted-prices",
-      "prNumber": 0,
+      "id": "pr1",
+      "vendor": "openai",
+      "title": "Update OpenAI risk model for gpt-5-mini deprecation",
+      "prUrl": "https://github.com/Kush614/upstream-watch/pull/6",
+      "prNumber": 6,
+      "branch": "upstream/openai-gpt5-mini-20260829",
       "status": "open",
-      "at": "2026-08-26T00:00"
-    },
-    {
-      "id": "d2",
-      "vendor": "stripe",
-      "title": "Updates bank account and payout method resources for Global Payouts",
-      "prUrl": "https://docs.stripe.com/changelog/dahlia#updates-v2-payout-method-and-vault-bank-account-resources",
-      "prNumber": 0,
-      "status": "open",
-      "at": "2026-08-26T00:00"
+      "at": "2026-08-29T21:57:47.760Z"
     }
-  ]
+  ],
+  "summary": {
+    "lastCheck": "2026-08-29T22:12:58.849Z",
+    "eventsSeen": 113,
+    "prsOpened": 2,
+    "prsMerged": 0,
+    "pendingApprovals": 1
+  }
 }

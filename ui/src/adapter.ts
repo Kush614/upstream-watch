@@ -76,9 +76,21 @@ export function unwrapEvents(payload: unknown): ServerEvent[] {
   return unwrapList<{ event?: ServerEvent } & ServerEvent>(payload).map((e) => e.event ?? (e as ServerEvent));
 }
 
-/** Both spellings appear depending on how the tool was gated. */
+/** Tools the agent may not call without a human (specs/agent.md §Approvals). */
+const GATED_TOOLS = ["merge_pull_request", "close_pull_request", "delete_repository"];
+
+/**
+ * `tool.approval_required` is always an approval. `tool.response_required` is the generic
+ * "this call needs a response" event — it is an approval only when the call it points at is
+ * a gated one. Treating every response_required as a gate produced phantom "Pending action"
+ * cards for ordinary tool calls.
+ */
 function isApprovalEvent(type: string): boolean {
   return type === "tool.approval_required" || type === "tool.response_required";
+}
+
+function isGatedCall(mcp: McpCall | null): boolean {
+  return mcp !== null && GATED_TOOLS.includes(mcp.tool);
 }
 
 function parseArgs(call: RawToolCall): Record<string, unknown> {
@@ -254,6 +266,9 @@ export function toApprovals(events: ServerEvent[]): PendingApproval[] {
       const call = source?.tool_calls?.find((c) => c.id === ref.id) ?? source?.tool_calls?.[0];
       const mcp = call ? asMcpCall(call) : null;
 
+      // A generic response_required for an ordinary tool is not a human gate.
+      if (event.type === "tool.response_required" && !isGatedCall(mcp)) continue;
+
       // Correlate to THIS approval, not to whatever happened last in the session. With two
       // changes in one session the reviewer would otherwise read one PR's changelog and diff
       // while approving the merge of a different PR number.
@@ -347,7 +362,7 @@ export function toDone(events: ServerEvent[]): DoneItem[] {
 }
 
 /** Which vendors were read, and whether live — the "is any of this real" question. */
-function toVendors(events: ServerEvent[]): SessionState["vendors"] {
+export function toVendors(events: ServerEvent[]): SessionState["vendors"] {
   const found = new Map<string, { provenance: string; entries: number }>();
 
   for (const e of events) {
