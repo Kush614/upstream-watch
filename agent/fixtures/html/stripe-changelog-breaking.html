@@ -5,8 +5,15 @@
   anything about live scraping. Structure mirrors a typical changelog page so the
   extraction spec in pipeline/extraction-specs/stripe.json has something real to bite on.
 
-  This is the BASELINE + ONE SEEDED BREAKING ENTRY (2026-08-28, `source` -> `payment_method`).
-  It must differ from stripe-changelog.html by exactly that one entry.
+  This is the BASELINE + TWO SEEDED ENTRIES, and the pairing is the point:
+
+    2026-08-28  `source` -> `payment_method`   BREAKING and ours      -> one event
+    2026-08-27  `radar_rules` removed          BREAKING but NOT ours  -> recorded, ignored
+
+  Both are new relative to the baseline, so a seeded demo run shows the agent acting on one
+  and deliberately declining to act on the other. Without the second entry the "listed and
+  ignored" beat in docs/DEMO.md has nothing to point at, because the baseline's own
+  irrelevant deprecation was already marked seen by `pnpm demo:seed`.
 -->
 <html lang="en">
 <head><meta charset="utf-8"><title>API changelog | Stripe Documentation</title></head>
@@ -26,6 +33,16 @@
           Requests that send <code>source</code> will begin returning an error after that date.</p>
           <p>Use <code>payment_method</code> instead. The value format is unchanged, so for most
           integrations this is a rename of the request parameter.</p>
+        </div>
+      </article>
+
+      <article class="changelog-entry" data-date="2026-08-27">
+        <h3 class="changelog-title">The <code>radar_rules</code> beta endpoint is removed</h3>
+        <a class="changelog-permalink" href="https://docs.stripe.com/changelog/2026-08-27-radar-rules-removed">Permalink</a>
+        <div class="changelog-body">
+          <p><strong>Breaking change.</strong> The beta <code>radar_rules</code> endpoint is
+          removed. Manage rules from the Dashboard instead. Integrations that never called
+          <code>radar_rules</code> are unaffected.</p>
         </div>
       </article>
 

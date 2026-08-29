@@ -36,8 +36,14 @@ describe("buildChargeParams", () => {
     expect(params.description).toBe("upstream-watch demo order");
   });
 
-  it("rejects a non-positive amount", () => {
-    expect(() => buildChargeParams({ amountCents: 0, currency: "usd", token: "tok_x" }))
+  it.each([
+    ["zero", 0],
+    ["a negative amount", -100],
+    ["a fractional amount", 1.5],
+    ["NaN", Number.NaN],
+    ["Infinity", Number.POSITIVE_INFINITY],
+  ])("rejects %s", (_label, amountCents) => {
+    expect(() => buildChargeParams({ amountCents, currency: "usd", token: "tok_x" }))
       .toThrow(RangeError);
   });
 });
