@@ -228,3 +228,39 @@ have half-worked and wasted an hour. The instruction that paid off was the one t
 Second lesson: I wrote `.tar.xz` because that is the download I reach for by habit. One probe
 of the actual image would have told me `xz` was missing before I spent a round-trip on it —
 the same mistake as assuming Bright Data could reach Stripe.
+
+## 2026-08-30 — The loop closed
+
+**Where:** everywhere
+**Symptom:** n/a — this one worked.
+
+One `check upstream` in a TrueForge session, with the relevance filter fixed:
+
+```
+bootstrap        Node installed, repo cloned, pnpm install (15.2s)
+skill            loaded from /opt/tf/skills/brightdata-changelog-scraper
+[thread]         watch-stripe  ┐ two watcher subagents, in parallel
+[thread]         watch-cloudflare ┘
+[thread]         patch-stripe-payment-method-types   ← ONE patcher, not four
+  patched        demo-app/src/payments.ts, stripe.ts, test/payments.test.ts
+  pnpm verify    3 typechecks, 116/116 tests
+  PR #5          opened via GitHub MCP
+"Merge PR #5"  → tool.approval_required — run paused, PR still OPEN, NOT MERGED
+```
+
+The patch is the real migration the changelog describes: `charges.create` →
+`paymentIntents.create`, the card token routed through `payment_method_data.card.token`, and
+`payment_method_types` removed — which is exactly what Stripe's entry says now returns a 400.
+The agent updated the pinned test itself, which `specs/patcher.md` rule 4 asks for and which I
+never told it to do.
+
+**Lesson:** The two things that made this work were both restraints rather than capabilities.
+Gating `merge_pull_request` *by name* rather than using `@write` let the agent open PRs freely
+while still stopping at the one irreversible step — a blunter gate would have made it ask
+permission for everything and the loop would never have run unattended. And narrowing the
+patch step to `relevance: symbol-match` turned four sandboxes and three unwanted PRs into one
+of each.
+
+The approval gate is not a formality bolted on for the judging criteria. The agent genuinely
+wanted to merge, had a green test suite and a defensible diff, and was stopped anyway. That is
+the whole product in one event.
