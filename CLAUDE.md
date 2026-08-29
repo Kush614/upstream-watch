@@ -76,6 +76,24 @@ pnpm demo:seed                   # loads fixtures + seeded breaking change
 
 Demo mode: `DEMO_MODE=1` makes the pipeline serve cached HTML from `agent/fixtures/` instead of hitting Bright Data. Always rehearse with this ON first, then OFF.
 
+Commands the agent and the demo actually use:
+
+```bash
+pnpm check                       # one pass over every watched target, rendered for a human
+pnpm check --json                # same run, structured — this is what the agent consumes
+pnpm check --json --no-persist   # inspect without marking entries as seen
+pnpm verify                      # typecheck + tests; what the patcher runs in the sandbox
+pnpm pr:body                     # JSON on stdin -> PR title + description on stdout
+pnpm demo:seed                   # reset state, baseline the fixtures, ready for a cold run
+```
+
+`DEMO_FIXTURE` selects which committed fixture demo mode serves: `baseline` (default),
+`breaking` (the seeded change), or `restructured` (the vendor redesigned their page — drives
+self-repair).
+
+**Re-run `pnpm demo:seed` before every rehearsal.** Without `--no-persist`, a run records what
+it saw, so a second run correctly reports nothing new — which looks like a broken demo.
+
 ## 6. Bright Data scraper settings (rules for the coding assistant)
 
 These settings are reused automatically by Claude Code. Do not ask the user for them.

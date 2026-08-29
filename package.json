@@ -8,6 +8,9 @@
   },
   "packageManager": "pnpm@10.13.0",
   "scripts": {
+    "check": "node --experimental-strip-types pipeline/src/index.ts",
+    "verify": "pnpm -r typecheck && pnpm -r test",
+    "pr:body": "node --experimental-strip-types pipeline/src/bin/pr-body.ts",
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",
     "demo:seed": "pnpm --filter pipeline demo:seed"
