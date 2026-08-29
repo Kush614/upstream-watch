@@ -69,7 +69,12 @@ export function App() {
             Waiting on you
             {state.pending.length > 0 && <span className="count">{state.pending.length}</span>}
           </h2>
-          <WaitingOn pending={state.pending} onDecide={onDecide} busy={busy} />
+          <WaitingOn
+            pending={state.pending}
+            onDecide={onDecide}
+            busy={busy}
+            connected={state.connected}
+          />
         </section>
 
         <section className="panel">

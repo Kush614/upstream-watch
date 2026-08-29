@@ -97,3 +97,7 @@ blockquote { margin: 0 0 8px; padding-left: 10px; border-left: 3px solid var(--l
 .pill--open { color: var(--accent); border-color: var(--accent); }
 .pill--draft { color: var(--warn); border-color: var(--warn); }
 .pill--rejected { color: var(--bad); border-color: var(--bad); }
+
+.notice { margin: 0 0 12px; padding: 8px 12px; border-radius: 8px; font-size: 13px;
+  color: var(--warn); border: 1px solid var(--warn);
+  background: color-mix(in srgb, var(--warn) 10%, transparent); }

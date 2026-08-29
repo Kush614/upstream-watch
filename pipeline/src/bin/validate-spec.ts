@@ -14,10 +14,25 @@ import { lastGoodPath, currentHtmlPath, newestSnapshot, readCached } from "../li
 import { entryKey } from "../lib/state.ts";
 import { extractEntries } from "../lib/parse.ts";
 import { fromRepoRoot } from "../lib/paths.ts";
+import { compareRecorded } from "../lib/regression.ts";
 import { parseSpecs } from "../lib/spec.ts";
 import { loadTarget } from "../lib/targets.ts";
 import { validateEntries } from "../lib/validate.ts";
 import type { ChangelogEntry } from "../types.ts";
+
+/**
+ * The entry keys `pnpm repair` recorded from the last-good page using the previous spec.
+ * Independent of the candidate, which is the whole point.
+ */
+async function readRecordedExamples(vendor: string): Promise<string[]> {
+  try {
+    const raw = await readFile(fromRepoRoot(`pipeline/state/${vendor}.repair-context.json`), "utf8");
+    const context = JSON.parse(raw) as { examples?: ChangelogEntry[] };
+    return (context.examples ?? []).map((e) => entryKey(e));
+  } catch {
+    return [];
+  }
+}
 
 function flag(name: string): string | undefined {
   const i = process.argv.indexOf(`--${name}`);
@@ -41,28 +56,39 @@ async function main(): Promise<void> {
 
   // Regression: the examples that used to parse must still parse from the last-good page.
   //
-  // specs/scraper-pipeline.md §4.3 asks that last-good examples still be findable "where
-  // possible". After a genuine redesign it is NOT possible — a spec written for the new
-  // marker cannot parse the old page, and that is success, not regression. So this is
-  // reported, never a hard gate; the hard gate is the current page.
+  // Regression check (specs/scraper-pipeline.md §4.3).
+  //
+  // The examples MUST come from somewhere independent of the candidate, or the check is
+  // circular. They are the entries `pnpm repair` recorded from the last-good page using
+  // the OLD spec, stored in the repair context. Comparing the candidate's output against
+  // those is the only version of this check that can actually fail.
+  //
+  // "Where possible" matters too: after a genuine redesign a spec written for the new
+  // page cannot read the old one, and that is success, not regression. So this reports,
+  // and never gates. The gate is the current page.
   //
   const lastGoodHtml = await readCached(lastGoodPath(vendor));
-  let regression: { checked: number; found: number; note: string } = {
-    checked: 0, found: 0, note: "no last-good HTML on record",
+  const recorded = await readRecordedExamples(vendor);
+
+  let regression: { checked: number; found: number; missing: string[]; note: string } = {
+    checked: 0, found: 0, missing: [], note: "no recorded examples — run `pnpm repair` first",
   };
 
-  if (lastGoodHtml) {
+  if (recorded.length === 0 && lastGoodHtml) {
+    regression.note = "no recorded examples to compare against; run `pnpm repair --vendor " + vendor + "`";
+  } else if (recorded.length > 0 && !lastGoodHtml) {
+    regression.note = "examples recorded but no last-good HTML to re-extract from";
+  } else if (recorded.length > 0 && lastGoodHtml) {
     const before = await validateEntries(extractEntries(lastGoodHtml, candidate), target.schema);
-    const keys = new Set(before.valid.map((e: ChangelogEntry) => entryKey(e)));
-    const examples = before.valid.slice(0, 3);
-    const found = examples.filter((e) => keys.has(entryKey(e))).length;
+    const compared = compareRecorded(recorded, before.valid);
 
     regression = {
-      checked: examples.length,
-      found,
+      checked: compared.checked,
+      found: compared.found,
+      missing: compared.missing.slice(0, 3),
       note: before.valid.length === 0
         ? "candidate cannot read the last-good page — expected when the vendor restructured"
-        : `candidate still reads the last-good page (${before.valid.length} entries)`,
+        : `candidate re-found ${compared.found}/${compared.checked} previously recorded entries`,
     };
   }
 

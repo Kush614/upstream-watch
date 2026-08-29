@@ -12,18 +12,33 @@ export function WaitingOn({
   pending,
   onDecide,
   busy,
+  connected,
 }: {
   pending: PendingApproval[];
   onDecide: (id: string, decision: "approve" | "reject", reason?: string) => void;
   busy: string | null;
+  /** False when reading the local feed: there is no session to send a decision to. */
+  connected: boolean;
 }) {
   if (pending.length === 0) {
     return <p className="empty">Nothing waiting on you.</p>;
   }
   return (
     <>
+      {!connected && (
+        <p className="notice">
+          Preview from the local feed. Approving needs a live TrueForge session — start the
+          harness and the buttons become active.
+        </p>
+      )}
       {pending.map((item) => (
-        <ApprovalCard key={item.id} item={item} onDecide={onDecide} busy={busy === item.id} />
+        <ApprovalCard
+          key={item.id}
+          item={item}
+          onDecide={onDecide}
+          busy={busy === item.id}
+          connected={connected}
+        />
       ))}
     </>
   );
@@ -33,10 +48,12 @@ function ApprovalCard({
   item,
   onDecide,
   busy,
+  connected,
 }: {
   item: PendingApproval;
   onDecide: (id: string, decision: "approve" | "reject", reason?: string) => void;
   busy: boolean;
+  connected: boolean;
 }) {
   const [rejecting, setRejecting] = useState(false);
   const [reason, setReason] = useState("");
@@ -106,7 +123,7 @@ function ApprovalCard({
               </button>
               <button
                 className="btn btn--danger"
-                disabled={busy || reason.trim().length === 0}
+                disabled={busy || !connected || reason.trim().length === 0}
                 onClick={() => onDecide(item.id, "reject", reason.trim())}
               >
                 Confirm reject
@@ -114,11 +131,16 @@ function ApprovalCard({
             </>
           ) : (
             <>
-              <button className="btn" onClick={() => setRejecting(true)} disabled={busy}>
+              <button className="btn" onClick={() => setRejecting(true)} disabled={busy || !connected}>
                 Reject
               </button>
               {/* The only irreversible control on the page. */}
-              <button className="btn btn--primary" disabled={busy} onClick={() => onDecide(item.id, "approve")}>
+              <button
+                className="btn btn--primary"
+                disabled={busy || !connected}
+                title={connected ? undefined : "needs a live TrueForge session"}
+                onClick={() => onDecide(item.id, "approve")}
+              >
                 {busy ? "Merging…" : "Approve & merge"}
               </button>
             </>
