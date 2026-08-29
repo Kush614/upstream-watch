@@ -291,7 +291,9 @@ which parts are live.
 
 Answered today:
 
-1. ~~GitHub MCP server name~~ — still open. The one remaining blocker for D3.
+1. ~~GitHub MCP server name~~ — **answered.** `github`, at
+   `https://api.githubcopilot.com/mcp/`, header-PAT auth. Configured and authenticated;
+   `merge_pull_request` confirmed among its 44 tools.
 2. ~~TrueForge local mode API key~~ — not needed for the panels; `adapter.ts` talks to
    `/api/v1/...` unauthenticated on localhost.
 3. ~~Bright Data CLI command~~ — **answered.** `POST https://api.brightdata.com/request`
@@ -299,15 +301,19 @@ Answered today:
    implemented in `pipeline/src/clients/brightdata.ts`.
 4. ~~Is `@truefoundry/trueforge-ui` embeddable standalone?~~ — **answered: yes.** Published
    at 0.2.4. Cut #4 is off the table.
-5. ~~How are approval checkpoints declared?~~ — **partly answered.** `trueforge-ui` exports
-   `useTrueFoundryRespondToToolApproval`, `ToolApprovalBar` and `ApprovalDecision`. The
-   remaining unknown is the REST route that lists *pending* approvals, isolated in
-   `ui/src/adapter.ts`.
+5. ~~How are approval checkpoints declared?~~ — **fully answered.** Configured per MCP
+   server via `MCPServerApprovalToolSelector` (`@all` / `@write` / `@destructive` / a tool
+   name). Pending approvals are not a REST resource: they arrive as `tool.approval_required`
+   events on `GET /api/v1/sessions/{id}/events` and are answered by posting a
+   `user.tool_approval` item to `POST /api/v1/sessions/{id}/turns`. Implemented.
 6. Does a saved agent's session survive a full harness restart, or only a browser refresh?
    Still open. `docs/DEMO.md` claims the former — weaken the claim if it turns out to be false.
 
-Still unverified, in priority order:
+Still unverified:
 
-- **Daytona sandbox provisioning.** No fallback that still scores the sandboxing criterion.
-- **GitHub MCP server + tool names** in the connector catalog.
-- **The pending-approvals route** in `/api/v1/docs`.
+- **Daytona sandbox provisioning.** The route exists — `PUT /api/v1/settings/sandbox-providers`,
+  and `GET /api/v1/catalogs/sandbox-providers` returns
+  `{"type":"daytona","exec_timeout_ms":60000,…}` — so this is configurable from the terminal
+  too. It needs a `DAYTONA_API_KEY`, which is the one thing still outstanding.
+- **A model provider.** `POST /api/v1/settings/model-providers` needs an
+  `OPENAI_API_KEY`. Without it the agent can be created but not run.

@@ -55,7 +55,9 @@ upstream-watch/
 
 - **Harness:** TrueForge local mode — `npx @truefoundry/trueforge` → http://localhost:8790. Node 22+. SQLite.
 - **Model:** OpenAI (hackathon credits) via TrueForge Settings → Models. Fallback: Anthropic key if configured.
-- **Tools (MCP):** GitHub MCP via OAuth (Settings → Connectors). VERIFY exact server name in catalog.
+- **Tools (MCP):** GitHub MCP, catalog name `github`, `https://api.githubcopilot.com/mcp/`.
+  Auth is a **header PAT, not OAuth** — configurable from the terminal with `gh auth token`
+  (see `specs/agent.md` §Connector). Gated tool: `merge_pull_request`.
 - **Sandbox:** Daytona (Settings → Sandbox providers). Sandbox is provisioned only for patch+test turns.
 - **Web data:** Bright Data Scraper Studio, driven from the terminal. Config in `skills/brightdata-changelog-scraper/SKILL.md`.
 - **API/SDK:** TrueForge HTTP API (REST + SSE, docs at `http://localhost:8790/api/v1/docs`), `@truefoundry/trueforge-core` (TS SDK).
