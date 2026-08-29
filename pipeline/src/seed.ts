@@ -58,7 +58,7 @@ async function main(): Promise<void> {
           `    Run: git restore demo-app   (check the diff first)`
         : `  ✓ demo-app is clean`,
       ``,
-      `Next: DEMO_MODE=1 DEMO_FIXTURE=breaking pnpm --filter pipeline dev`,
+      `Next: DEMO_MODE=1 DEMO_FIXTURE=breaking pnpm check`,
       ``,
     ].join("\n"),
   );

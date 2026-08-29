@@ -68,9 +68,15 @@ async function main(): Promise<number> {
   }
 
   const breaking = report.events.filter((e) => e.kind === "breaking-change").length;
+  const broken = report.events.filter((e) => e.kind === "extraction-broken").length;
+
+  const summary: string[] = [];
+  if (breaking > 0) summary.push(`${breaking} change(s) need a patch`);
+  if (broken > 0) summary.push(`${broken} extraction(s) need repairing`);
+
   lines.push(
-    breaking > 0
-      ? `${breaking} change(s) need a patch. The agent takes it from here.`
+    summary.length > 0
+      ? `${summary.join(", ")}. The agent takes it from here.`
       : `Nothing to do.`,
     ``,
   );
