@@ -9,7 +9,10 @@ export function Did({ done }: { done: DoneItem[] }) {
       {done.map((item) => (
         <li key={item.id} className="done__row">
           <span className={`pill pill--${item.status}`}>{item.status}</span>
-          <span className="done__title">{item.title}</span>
+          <span className="done__title">
+            {item.prNumber > 0 && <span className="done__num">#{item.prNumber}</span>}
+            {item.title}
+          </span>
           {item.branch && <code className="done__branch">{item.branch}</code>}
           <span className="done__meta">
             {item.vendor}

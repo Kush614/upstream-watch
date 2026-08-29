@@ -21,11 +21,24 @@ import { excerpt } from "../pipeline/src/lib/pr.ts";
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const now = (offsetSec: number) => new Date(Date.now() + offsetSec * 1000).toISOString();
 
-async function proposedDiff(file: string): Promise<string> {
+async function proposedDiff(file: string, symbols: string[]): Promise<string> {
   const source = await readFile(`${ROOT}/${file}`, "utf8");
   const lines = source.split("\n");
-  const at = lines.findIndex((l) => l.includes("stripe.charges.create"));
-  if (at === -1) return "(no charges.create call found in the watched file)";
+
+  // Symbols are written the way a *changelog* writes them (`payment_intents`,
+  // `PaymentIntent#create`); the code spells the same thing `paymentIntents`. Compare with
+  // separators stripped so the two forms meet.
+  const norm = (t: string) => t.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const wanted = symbols.map(norm).filter((t) => t.length > 3);
+
+  // Prefer a real code line: the symbol usually appears in the doc comment above it too,
+  // and a diff of prose is not a proposed patch.
+  const isCode = (l: string) => !/^\s*(\*|\/\/|\/\*)/.test(l) && l.trim().length > 0;
+  const matches = (l: string) => wanted.some((sym) => norm(l).includes(sym));
+
+  const at = lines.findIndex((l) => isCode(l) && matches(l));
+  if (at === -1) return `(no watched symbol [${symbols.join(", ")}] found in ${file})`;
+
 
   // Real current lines; the replacement is the migration the changelog entry describes.
   return [
@@ -33,7 +46,7 @@ async function proposedDiff(file: string): Promise<string> {
     `+++ b/${file}`,
     `@@ -${at + 1},3 +${at + 1},3 @@`,
     `-${lines[at]}`,
-    `+  const charge = await stripe.paymentIntents.create({`,
+    `+${(lines[at] ?? "").replace(/["'`][\w.@/-]+["'`]/, '"<vendor-recommended replacement>"')}`,
     ` ${lines[at + 1] ?? ""}`,
   ].join("\n");
 }
@@ -84,7 +97,7 @@ async function main(): Promise<void> {
       symbols: ours.symbols,
     },
     files: ours.files,
-    diff: await proposedDiff(file),
+    diff: await proposedDiff(file, ours?.type === "change" ? ours.symbols : []),
     testsPassed: true,
     testOutput: "Test Files 1 passed (1)\n     Tests 14 passed (14)",
     prUrl: "https://github.com/Kush614/upstream-watch/pull/4",

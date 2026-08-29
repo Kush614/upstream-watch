@@ -57,6 +57,18 @@ async function gitWithStdin(args: string[], input: string, cwd = REPO_ROOT): Pro
   });
 }
 
+/** Paths a unified diff touches, so only those get staged. */
+export function filesInDiff(diff: string): string[] {
+  const paths = new Set<string>();
+  for (const m of diff.matchAll(/^diff --git a\/(\S+) b\/(\S+)$/gm)) {
+    if (m[2]) paths.add(m[2]);
+  }
+  for (const m of diff.matchAll(/^\+\+\+ b\/(\S+)$/gm)) {
+    if (m[1] && m[1] !== "/dev/null") paths.add(m[1]);
+  }
+  return [...paths];
+}
+
 export interface OpenPrInput {
   branch: string;
   base: string;
@@ -117,7 +129,13 @@ export class GhCliClient implements GitHubClient {
         await gitWithStdin(["apply", "-"], input.diff);
       }
 
-      await git(["add", "-A"]);
+      // Stage only what the patch touched. `git add -A` swept up anything else already in
+      // the working tree — unrelated edits, stray files — and pushed them into a PR a human
+      // is about to approve.
+      const touched = filesInDiff(input.diff);
+      if (touched.length > 0) await git(["add", "--", ...touched]);
+      else await git(["add", "-A"]); // no diff: the caller is committing a prepared tree
+
       await git(["commit", "-q", "-m", input.commitMessage]);
       await git(["push", "-q", "-u", "origin", input.branch]);
 

@@ -67,6 +67,20 @@ function unwrapList<T>(payload: unknown): T[] {
   return Array.isArray(data) ? (data as T[]) : [];
 }
 
+/**
+ * The events endpoint returns `{ data: [{ event: {...} }] }` — each item wraps the event.
+ * Passing the envelope to the mappers made every panel render empty against a live
+ * session while looking perfectly fine against a hand-built fixture.
+ */
+export function unwrapEvents(payload: unknown): ServerEvent[] {
+  return unwrapList<{ event?: ServerEvent } & ServerEvent>(payload).map((e) => e.event ?? (e as ServerEvent));
+}
+
+/** Both spellings appear depending on how the tool was gated. */
+function isApprovalEvent(type: string): boolean {
+  return type === "tool.approval_required" || type === "tool.response_required";
+}
+
 function parseArgs(call: RawToolCall): Record<string, unknown> {
   try {
     return JSON.parse(call.function?.arguments ?? "{}") as Record<string, unknown>;
@@ -91,7 +105,7 @@ function asMcpCall(call: RawToolCall): McpCall | null {
 /* ─────────────────────────────── steps ──────────────────────────────────── */
 
 function stepKind(event: ServerEvent, mcp: McpCall | null, toolName: string): StepKind {
-  if (event.type.includes("approval") || event.type === "tool.response_required") return "approval";
+  if (isApprovalEvent(event.type)) return "approval";
   if (mcp?.tool === "merge_pull_request") return "merge";
   if (mcp?.tool.includes("pull_request")) return "pr";
   if (event.type.startsWith("thread.")) return "subagent";
@@ -101,7 +115,7 @@ function stepKind(event: ServerEvent, mcp: McpCall | null, toolName: string): St
   return "skill";
 }
 
-function toSteps(events: ServerEvent[]): Step[] {
+export function toSteps(events: ServerEvent[]): Step[] {
   const steps: Step[] = [];
 
   for (const [i, event] of events.entries()) {
@@ -184,19 +198,31 @@ export function readPrBody(body: string) {
     rationale: /\*\*Why this matters:\*\*\s*(.+)/.exec(body)?.[1]?.trim() ?? "",
     files: [...(/\*\*Files changed:\*\*\s*(.+)/.exec(body)?.[1] ?? "").matchAll(/[\w./-]+\.\w+/g)].map((m) => m[0]),
     testOutput: /```\n([\s\S]*?)```/.exec(body)?.[1]?.trim() ?? "",
-    provenance: /Provenance:\s*(\w+)/.exec(body)?.[1] ?? (/live via Bright Data/.test(body) ? "live" : ""),
+    // buildPr writes either "Scraped live via Bright Data" or "from cache (DEMO_MODE)".
+    // Missing the cached spelling lost the badge on exactly the entries that need it most.
+    provenance:
+      /Provenance:\s*(\w+)/.exec(body)?.[1] ??
+      (/live via Bright Data/.test(body) ? "live" : /from cache|committed capture|\(DEMO_MODE\)/.test(body) ? "cache" : ""),
   };
 }
 
 /** The patcher subagent's `{diff, testOutput, passed, rationale}`, from its finished thread. */
-function patcherResults(events: ServerEvent[]): Array<{ title: string; diff: string; passed: boolean; rationale: string }> {
+function patcherResults(events: ServerEvent[]): Array<{ index: number; title: string; diff: string; passed: boolean | null; rationale: string }> {
   const out = [];
-  for (const e of events) {
+  for (const [index, e] of events.entries()) {
     if (e.type !== "thread.done") continue;
     try {
-      const parsed = JSON.parse(e.state?.output?.content ?? "") as { diff?: string; passed?: boolean; rationale?: string };
+      const parsed = JSON.parse(e.state?.output?.content ?? "") as { diff?: string; passed?: unknown; rationale?: string };
       if (parsed.diff) {
-        out.push({ title: e.title ?? "patcher", diff: parsed.diff, passed: parsed.passed !== false, rationale: parsed.rationale ?? "" });
+        out.push({
+          index,
+          title: e.title ?? "patcher",
+          diff: parsed.diff,
+          // Only an explicit true is a pass. Absent or malformed means unknown, and the
+          // card says so — this badge sits above the merge button.
+          passed: parsed.passed === true ? true : parsed.passed === false ? false : null,
+          rationale: parsed.rationale ?? "",
+        });
       }
     } catch {
       /* not a patcher thread */
@@ -205,8 +231,11 @@ function patcherResults(events: ServerEvent[]): Array<{ title: string; diff: str
   return out;
 }
 
-function toApprovals(events: ServerEvent[]): PendingApproval[] {
+export function toApprovals(events: ServerEvent[]): PendingApproval[] {
   const byId = new Map(events.filter((e) => e.id).map((e) => [e.id!, e]));
+  const prCalls = events.flatMap((e, index) =>
+    (e.tool_calls ?? []).map(asMcpCall).filter((c): c is McpCall => c?.tool === "create_pull_request").map((call) => ({ index, call })),
+  );
   const answered = new Set(
     events.flatMap((e) => (e.type === "user.tool_approval" ? [String((e as unknown as { tool_call_id?: string }).tool_call_id ?? "")] : [])),
   );
@@ -214,8 +243,8 @@ function toApprovals(events: ServerEvent[]): PendingApproval[] {
 
   const pending: PendingApproval[] = [];
 
-  for (const event of events) {
-    if (event.type !== "tool.approval_required") continue;
+  for (const [eventIndex, event] of events.entries()) {
+    if (!isApprovalEvent(event.type)) continue;
 
     for (const ref of event.tool_calls ?? []) {
       if (!ref.id || answered.has(ref.id)) continue;
@@ -225,13 +254,12 @@ function toApprovals(events: ServerEvent[]): PendingApproval[] {
       const call = source?.tool_calls?.find((c) => c.id === ref.id) ?? source?.tool_calls?.[0];
       const mcp = call ? asMcpCall(call) : null;
 
-      const prCall = events
-        .flatMap((e) => e.tool_calls ?? [])
-        .map(asMcpCall)
-        .findLast((c): c is McpCall => c?.tool === "create_pull_request");
-
+      // Correlate to THIS approval, not to whatever happened last in the session. With two
+      // changes in one session the reviewer would otherwise read one PR's changelog and diff
+      // while approving the merge of a different PR number.
+      const prCall = prCalls.filter((p) => p.index < eventIndex).at(-1)?.call;
       const parsed = readPrBody(String(prCall?.input.body ?? ""));
-      const patch = patches.at(-1);
+      const patch = patches.filter((p) => p.index < eventIndex).at(-1);
 
       // The gated call is usually merge_pull_request, and its own input names the PR. That
       // matters when the merge is requested in a session that did not open the PR — the
@@ -277,26 +305,45 @@ function toApprovals(events: ServerEvent[]): PendingApproval[] {
 
 /* ───────────────────────────────── did ──────────────────────────────────── */
 
-function toDone(events: ServerEvent[]): DoneItem[] {
-  const merged = new Set(
+export function toDone(events: ServerEvent[]): DoneItem[] {
+  // Which PR numbers were actually merged — not "was anything merged".
+  const mergedNumbers = new Set(
     events.flatMap((e) => (e.tool_calls ?? []).map(asMcpCall))
       .filter((c): c is McpCall => c?.tool === "merge_pull_request")
-      .map((c) => String(c.input.pullNumber ?? c.input.pull_number ?? "")),
+      .map((c) => Number(c.input.pullNumber ?? c.input.pull_number ?? 0))
+      .filter(Boolean),
   );
 
-  return events
+  // The create_pull_request RESPONSE carries the real URL, e.g.
+  // {"id":"...","url":"https://github.com/owner/repo/pull/7"} — the only place the number
+  // exists. Without it every row linked to the repository root.
+  const createdUrls: string[] = [];
+  for (const e of events) {
+    if (typeof e.content !== "string") continue;
+    for (const m of e.content.matchAll(/https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/pull\/(\d+)/g)) {
+      if (!createdUrls.includes(m[0])) createdUrls.push(m[0]);
+    }
+  }
+
+  const calls = events
     .flatMap((e) => (e.tool_calls ?? []).map((c) => ({ call: asMcpCall(c), at: e.created_at ?? "" })))
-    .filter((x): x is { call: McpCall; at: string } => x.call?.tool === "create_pull_request")
-    .map(({ call, at }, i) => ({
+    .filter((x): x is { call: McpCall; at: string } => x.call?.tool === "create_pull_request");
+
+  return calls.map(({ call, at }, i) => {
+    const url = createdUrls[i] ?? "";
+    const number = Number(/\/pull\/(\d+)/.exec(url)?.[1] ?? 0);
+
+    return {
       id: `pr${i}`,
       vendor: readPrBody(String(call.input.body ?? "")).vendor,
       title: String(call.input.title ?? ""),
-      prUrl: `https://github.com/${call.input.owner}/${call.input.repo}`,
-      prNumber: 0,
+      prUrl: url || `https://github.com/${call.input.owner}/${call.input.repo}/pulls`,
+      prNumber: number,
       branch: String(call.input.head ?? ""),
-      status: merged.size > 0 ? "merged" : "open",
+      status: number && mergedNumbers.has(number) ? "merged" : "open",
       at,
-    }));
+    };
+  });
 }
 
 /** Which vendors were read, and whether live — the "is any of this real" question. */
@@ -351,7 +398,7 @@ export async function loadSession(sessionId?: string, signal?: AbortSignal): Pro
     return { ...EMPTY, connected: false, source: "trueforge", error: "session found, but its events could not be read — approvals may be hidden" };
   }
 
-  const events = unwrapList<ServerEvent>(raw);
+  const events = unwrapEvents(raw);
   const steps = toSteps(events);
   const pending = toApprovals(events);
   const done = toDone(events);

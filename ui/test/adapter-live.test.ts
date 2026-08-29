@@ -76,3 +76,53 @@ describe("real event stream", () => {
     expect(before.join("\n")).not.toEqual(after.join("\n"));
   });
 });
+
+describe("the two bugs that made the UI render nothing against a live session", () => {
+  it("unwraps the { event: … } envelope the events endpoint returns", async () => {
+    const { unwrapEvents } = await import("../src/adapter.ts");
+
+    // Every item from /sessions/{id}/events wraps the event. Handing the envelope to the
+    // mappers produced empty panels while a hand-built fixture looked perfectly fine.
+    expect(all.every((e) => "event" in e)).toBe(true);
+
+    const flat = unwrapEvents({ data: all });
+    expect(flat.length).toBe(all.length);
+    expect(flat.some((e) => typeof e.type === "string" && e.type.length > 0)).toBe(true);
+  });
+
+  it("recognises the approval event type this server actually emits", async () => {
+    const { unwrapEvents, toApprovals } = await import("../src/adapter.ts");
+    const flat = unwrapEvents({ data: all });
+
+    // The captured stream uses tool.response_required, not tool.approval_required.
+    expect(flat.some((e) => e.type === "tool.response_required")).toBe(true);
+    expect(toApprovals(flat).length).toBeGreaterThan(0);
+  });
+
+  it("builds steps from the real stream", async () => {
+    const { unwrapEvents, toSteps } = await import("../src/adapter.ts");
+
+    const steps = toSteps(unwrapEvents({ data: all }));
+    expect(steps.length).toBeGreaterThan(5);
+    expect(steps.some((s) => s.label.includes("github:"))).toBe(true);
+    expect(steps.some((s) => s.kind === "subagent")).toBe(true);
+  });
+
+  it("links the Did panel to real pull request numbers, not the repo root", async () => {
+    const { unwrapEvents, toDone } = await import("../src/adapter.ts");
+
+    const done = toDone(unwrapEvents({ data: all }));
+    expect(done.length).toBeGreaterThan(0);
+    // The number only exists in the create_pull_request RESPONSE.
+    expect(done.some((d) => d.prNumber > 0)).toBe(true);
+    expect(done.every((d) => d.prUrl.includes("github.com"))).toBe(true);
+  });
+
+  it("does not mark a PR merged just because some merge happened in the session", async () => {
+    const { unwrapEvents, toDone } = await import("../src/adapter.ts");
+
+    const done = toDone(unwrapEvents({ data: all }));
+    // No merge_pull_request in this capture, so nothing may claim merged.
+    expect(done.every((d) => d.status === "open")).toBe(true);
+  });
+});
