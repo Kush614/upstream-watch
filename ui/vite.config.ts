@@ -13,6 +13,8 @@ export default defineConfig({
       // falls through to its SPA handler and answers every /api request with index.html,
       // so the app sees HTML instead of JSON and sits on "local feed" forever, with a 200
       // on every request and nothing in the log.
+      // The before/after proof runner (scripts/proof-runner.ts).
+      "/proof": { target: process.env.PROOF_URL ?? "http://127.0.0.1:8791", changeOrigin: true },
       "/api": {
         target: process.env.TRUEFORGE_URL ?? "http://[::1]:8790",
         changeOrigin: true,

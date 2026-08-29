@@ -1,0 +1,41 @@
+{
+  "emulatedDate": "2026-12-11",
+  "before": {
+    "side": "before",
+    "sha": "8cc13fe",
+    "request": {
+      "model": "gpt-5-mini-2025-08-07",
+      "input": "Assess fraud risk for a card payment…",
+      "store": false
+    },
+    "changedKey": "model",
+    "status": 400,
+    "responseExcerpt": "The model `gpt-5-mini-2025-08-07` has been shut down. Learn more: https://platform.openai.com/docs/deprecations",
+    "tests": {
+      "passed": 21,
+      "failed": 2,
+      "output": "    \u001b[90m 50| \u001b[39m      })\u001b[33m;\u001b[39m\n    \u001b[90m 51| \u001b[39m\n    \u001b[90m 52| \u001b[39m      \u001b[35mif\u001b[39m (\u001b[33m!\u001b[39mres\u001b[33m.\u001b[39mok) \u001b[35mthrow\u001b[39m \u001b[35mnew\u001b[39m \u001b[33mError\u001b[39m(\u001b[32m`OpenAI risk check failed: \u001b[39m\u001b[36m${\u001b[39mres\u001b[33m.\u001b[39mst…\n    \u001b[90m   | \u001b[39m                         \u001b[31m^\u001b[39m\n    \u001b[90m 53| \u001b[39m\n    \u001b[90m 54| \u001b[39m      \u001b[35mconst\u001b[39m body \u001b[33m=\u001b[39m (\u001b[35mawait\u001b[39m res\u001b[33m.\u001b[39m\u001b[34mjson\u001b[39m()) \u001b[35mas\u001b[39m { choices\u001b[33m?\u001b[39m\u001b[33m:\u001b[39m \u001b[33mArray\u001b[39m\u001b[33m<\u001b[39m{ message\u001b[33m?\u001b[39m\u001b[33m:\u001b[39m…\n\u001b[90m \u001b[2m❯\u001b[22m test/vendor-live.test.ts:\u001b[2m19:24\u001b[22m\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\u001b[22m\u001b[39m\n\n\u001b[31m\u001b[1m\u001b[7m FAIL \u001b[27m\u001b[22m\u001b[39m test/vendors.test.ts\u001b[2m > \u001b[22mOpenAI risk check\u001b[2m > \u001b[22muses the model this service is pinned to\n\u001b[31m\u001b[1mAssertionError\u001b[22m: expected 'gpt-5-mini-2025-08-07' to be 'gpt-5.6-terra' // Object.is equality\u001b[39m\n\nExpected: \u001b[32m\"gpt-5\u001b[7m.6-terra\u001b[27m\"\u001b[39m\nReceived: \u001b[31m\"gpt-5\u001b[7m-mini-2025-08-07\u001b[27m\"\u001b[39m\n\n\u001b[36m \u001b[2m❯\u001b[22m test/vendors.test.ts:\u001b[2m9:24\u001b[22m\u001b[39m\n    \u001b[90m  7| \u001b[39m    \u001b[90m// Pinned deliberately: OpenAI publishes a shutdown date for this \u001b[39m…\n    \u001b[90m  8| \u001b[39m    \u001b[90m// deprecation lands this assertion is what has to change alongsid\u001b[39m…\n    \u001b[90m  9| \u001b[39m    \u001b[34mexpect\u001b[39m(\u001b[33mRISK_MODEL\u001b[39m)\u001b[33m.\u001b[39m\u001b[34mtoBe\u001b[39m(\u001b[32m\"gpt-5.6-terra\"\u001b[39m)\u001b[33m;\u001b[39m\n    \u001b[90m   | \u001b[39m                       \u001b[31m^\u001b[39m\n    \u001b[90m 10| \u001b[39m  })\u001b[33m;\u001b[39m\n    \u001b[90m 11| \u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯\u001b[22m\u001b[39m"
+    },
+    "emulatedDate": "2026-12-11",
+    "at": "2026-08-29T23:20:41.483Z"
+  },
+  "after": {
+    "side": "after",
+    "sha": "f7c7372",
+    "request": {
+      "model": "gpt-5.6-terra",
+      "input": "Assess fraud risk for a card payment…",
+      "store": false
+    },
+    "changedKey": "model",
+    "status": 200,
+    "responseExcerpt": "{\"id\":\"resp_proof\",\"output_text\":\"low — small amount, familiar country\"}",
+    "tests": {
+      "passed": 23,
+      "failed": 0,
+      "output": "\u001b[1m\u001b[7m\u001b[36m RUN \u001b[39m\u001b[27m\u001b[22m \u001b[36mv2.1.9 \u001b[39m\u001b[90m/private/var/folders/rl/rxv___wj1sx2l4416vcf9dsc0000gn/T/uw-proof-mq0oY1/demo-app\u001b[39m\n\n \u001b[32m✓\u001b[39m test/cdn.test.ts \u001b[2m(\u001b[22m\u001b[2m2 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[90m 2\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m test/vendors.test.ts \u001b[2m(\u001b[22m\u001b[2m6 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[90m 3\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m test/vendor-live.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[90m 16\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m test/payments.test.ts \u001b[2m(\u001b[22m\u001b[2m14 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[90m 23\u001b[2mms\u001b[22m\u001b[39m\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[32m4 passed\u001b[39m\u001b[22m\u001b[90m (4)\u001b[39m\n\u001b[2m      Tests \u001b[22m \u001b[1m\u001b[32m23 passed\u001b[39m\u001b[22m\u001b[90m (23)\u001b[39m\n\u001b[2m   Start at \u001b[22m 16:20:41\n\u001b[2m   Duration \u001b[22m 331ms\u001b[2m (transform 90ms, setup 0ms, collect 174ms, tests 44ms, environment 1ms, prepare 211ms)\u001b[22m"
+    },
+    "emulatedDate": "2026-12-11",
+    "at": "2026-08-29T23:20:42.340Z"
+  }
+}

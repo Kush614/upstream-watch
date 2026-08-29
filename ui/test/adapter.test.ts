@@ -1,100 +1,141 @@
 import { describe, it, expect } from "vitest";
-import { readPrBody, splitDiff, testResultFrom } from "../src/adapter.ts";
+import { currentPhase, daysAgo, mergedDetail, type UiEvent } from "../src/adapter.ts";
+import { MockAdapter, TIMELINE } from "../src/adapter.mock.ts";
 
-/** A PR body in the shape agent/prompts/pr-body.md produces. */
-const BODY = `## Upstream change detected — openai
-
-**Changelog entry** (2026-12-11): \`gpt-5-mini-2025-08-07\`
-> Dec 11, 2026 \`gpt-5-mini-2025-08-07\` → \`gpt-5.6-terra\`
-Source: https://platform.openai.com/docs/deprecations
-Provenance: cache
-
-**Why this matters:** Replaced the deprecated risk model with the recommended replacement.
-
-**Files changed:** demo-app/src/risk.ts, demo-app/test/vendors.test.ts
-
-**Tests:**
-\`\`\`
-vitest run: 3 files, 20 tests passed
-\`\`\`
-`;
-
-describe("testResultFrom", () => {
-  it("reads a definite pass", () => {
-    expect(testResultFrom("20 tests passed")).toBe(true);
+describe("daysAgo", () => {
+  it("counts whole days since the shutdown", () => {
+    expect(daysAgo("2026-07-23", new Date("2026-08-29T23:00:00Z"))).toBe(37);
   });
 
-  it("reads a definite failure", () => {
-    expect(testResultFrom("2 failed | 18 passed")).toBe(false);
-  });
-
-  it("returns null when nothing says either way", () => {
-    // The dangerous case: this badge sits above the only irreversible button on the page.
-    expect(testResultFrom("running…")).toBeNull();
-    expect(testResultFrom("")).toBeNull();
-  });
-
-  it("never reports a pass merely because output exists", () => {
-    expect(testResultFrom("some unrelated log output")).not.toBe(true);
+  it("floors at zero rather than counting backwards", () => {
+    // A date that has not arrived is not "-14 days ago".
+    expect(daysAgo("2026-12-11", new Date("2026-08-29T00:00:00Z"))).toBe(0);
   });
 });
 
-describe("readPrBody", () => {
-  const parsed = readPrBody(BODY);
+describe("mergedDetail", () => {
+  it("lets later events refine earlier ones without erasing them", () => {
+    const events: UiEvent[] = [
+      { phase: "change_found", message: "", at: "", detail: { vendor: "openai", shutdownDate: "2026-12-11" } },
+      { phase: "awaiting_approval", message: "", at: "", detail: { diff: "x" } },
+    ];
 
-  it("recovers vendor, date and source link", () => {
-    expect(parsed.vendor).toBe("openai");
-    expect(parsed.date).toBe("2026-12-11");
-    expect(parsed.url).toBe("https://platform.openai.com/docs/deprecations");
+    // The approval event carries no vendor; the card still needs one.
+    const d = mergedDetail(events);
+    expect(d.vendor).toBe("openai");
+    expect(d.shutdownDate).toBe("2026-12-11");
+    expect(d.diff).toBe("x");
   });
 
-  it("recovers the quoted excerpt and the rationale", () => {
-    expect(parsed.excerpt).toContain("gpt-5.6-terra");
-    expect(parsed.rationale).toContain("recommended replacement");
-  });
+  it("ignores undefined rather than blanking a known value", () => {
+    const events: UiEvent[] = [
+      { phase: "change_found", message: "", at: "", detail: { vendor: "openai" } },
+      { phase: "testing", message: "", at: "", detail: { vendor: undefined } },
+    ];
 
-  it("recovers the changed files and the provenance", () => {
-    expect(parsed.files).toContain("demo-app/src/risk.ts");
-    expect(parsed.provenance).toBe("cache");
-  });
-
-  it("degrades to empty rather than throwing on an unrecognised body", () => {
-    const bare = readPrBody("");
-
-    expect(bare.vendor).toBe("unknown");
-    expect(bare.files).toEqual([]);
+    expect(mergedDetail(events).vendor).toBe("openai");
   });
 });
 
-describe("splitDiff", () => {
-  it("separates removed from added lines", () => {
-    const { before, after } = splitDiff(
-      'diff --git a/x b/x\nindex 1..2\n--- a/x\n+++ b/x\n@@ -1 +1 @@\n-const M = "old";\n+const M = "new";\n',
-    );
-
-    expect(before.join("")).toContain('"old"');
-    expect(after.join("")).toContain('"new"');
-    expect(before.join("")).not.toContain('"new"');
-  });
-
-  it("keeps context lines on both sides", () => {
-    const { before, after } = splitDiff("@@ -1,2 +1,2 @@\n context\n-gone\n+added\n");
-
-    expect(before).toContain("context");
-    expect(after).toContain("context");
+describe("currentPhase", () => {
+  it("is idle with nothing to report", () => {
+    expect(currentPhase([])).toBe("idle");
   });
 });
 
-describe("a merge gate opened in a session that did not create the PR", () => {
-  it("takes the PR identity from the gated call's own input", () => {
-    // merge_pull_request carries {owner, repo, pullNumber}. A watch someone returns to days
-    // later will have the merge in one session and the PR creation in another, so the card
-    // has to work from the merge call alone.
-    const input = { owner: "Kush614", repo: "upstream-watch", pullNumber: 6 };
-    const number = Number(input.pullNumber ?? 0);
-    const url = `https://github.com/${input.owner}/${input.repo}/pull/${number}`;
+describe("the scripted timeline", () => {
+  it("tells the whole story in order", () => {
+    expect(TIMELINE.map((e) => e.phase)).toEqual([
+      "idle", "watching", "change_found", "testing",
+      "awaiting_approval", "merged", "repairing", "repaired",
+    ]);
+  });
 
-    expect(number).toBe(6);
-    expect(url).toBe("https://github.com/Kush614/upstream-watch/pull/6");
+  it("says nothing technical in the messages the screen shows by default", () => {
+    // No jargon in the default view: the words below belong behind expandable panels.
+    const banned = /\b(API|MCP|sandbox|schema|PR|pull request|subagent)\b/;
+    for (const e of TIMELINE) expect(e.message).not.toMatch(banned);
+  });
+
+  it("carries a real changelog URL, not a placeholder", () => {
+    const found = TIMELINE.find((e) => e.detail?.changelog?.url);
+    expect(found?.detail?.changelog?.url).toContain("platform.openai.com");
+  });
+
+  it("only offers an approval while one is actually pending", () => {
+    for (const e of TIMELINE) {
+      if (e.detail?.approvalId) expect(e.phase).toBe("awaiting_approval");
+    }
+  });
+});
+
+describe("MockAdapter", () => {
+  it("fails BEFORE and passes AFTER, because the shutdown already happened", async () => {
+    const a = new MockAdapter();
+    a.reset();
+    for (let i = 0; i < 4; i++) a.advance();
+
+    const { before, after } = await a.loadLastRun();
+    expect(before?.status).toBe(404);
+    expect(before?.tests.failed).toBeGreaterThan(0);
+    expect(after?.status).toBe(200);
+    expect(after?.tests.failed).toBe(0);
+  });
+
+  it("has no date to emulate — the old model is gone whenever you look", async () => {
+    const a = new MockAdapter();
+    a.reset();
+    for (let i = 0; i < 4; i++) a.advance();
+
+    // There is no slider to drag back to a working past: gpt-5.1-codex-mini was shut down
+    // on 2026-07-23 and api.openai.com has returned 404 for it ever since.
+    expect((await a.loadLastRun()).before?.status).toBe(404);
+  });
+
+  it("streams request then response then tests", async () => {
+    const a = new MockAdapter();
+    const phases: string[] = [];
+    for await (const chunk of await a.run("after")) phases.push(chunk.phase);
+
+    expect(phases).toEqual(["request", "response", "tests"]);
+  });
+
+  it("jumps to merged on approve", async () => {
+    const a = new MockAdapter();
+    a.reset();
+    let phase = "";
+    a.subscribe((e) => { phase = e.phase; });
+    await a.approve("mock-approval-1");
+
+    expect(phase).toBe("merged");
+  });
+});
+
+describe("regressions the review caught", () => {
+  it("does not call a session merged when the newest change is still open", async () => {
+    // "Any merged item" announced success while linking an older merge, with a later
+    // change still awaiting a human.
+    const { toUiEventForTest } = await import("../src/adapter.real.ts");
+    const state = {
+      connected: true, source: "trueforge" as const, vendors: [], steps: [], pending: [],
+      done: [
+        { id: "a", vendor: "openai", title: "old", prUrl: "u", prNumber: 5, branch: "", status: "merged" as const, at: "" },
+        { id: "b", vendor: "openai", title: "new", prUrl: "u", prNumber: 6, branch: "", status: "open" as const, at: "" },
+      ],
+      summary: { lastCheck: null, eventsSeen: 0, prsOpened: 2, prsMerged: 1, pendingApprovals: 0 },
+    };
+
+    expect(toUiEventForTest(state).phase).not.toBe("merged");
+  });
+
+  it("calls it merged when the newest change is the merged one", async () => {
+    const { toUiEventForTest } = await import("../src/adapter.real.ts");
+    const state = {
+      connected: true, source: "trueforge" as const, vendors: [], steps: [], pending: [],
+      done: [{ id: "b", vendor: "openai", title: "new", prUrl: "u", prNumber: 6, branch: "", status: "merged" as const, at: "" }],
+      summary: { lastCheck: null, eventsSeen: 0, prsOpened: 1, prsMerged: 1, pendingApprovals: 0 },
+    };
+
+    expect(toUiEventForTest(state).phase).toBe("merged");
   });
 });

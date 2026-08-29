@@ -420,3 +420,100 @@ them. The error told me exactly what was wrong and where, and wrote itself down 
 asked. Failure documentation is cheap to add while writing the failure and expensive to
 reconstruct afterwards.
 
+
+## 2026-08-30 — The proof was showing a request no commit ever made
+
+**Where:** `scripts/proof-runner.ts` (now `scripts/proof/`)
+**Symptom:** None visible — the columns looked right. Qodo found it by reading.
+**Cause:** The runner *composed* the request it displayed (`{model, input, store}`) and sent
+that itself, rather than capturing what the checked-out commit actually sent during its test
+run. The screen would have attributed a request body and a status to a commit that may never
+have produced them. On a page whose entire claim is "everything here is real except the
+labelled emulation", that is the one thing that must not be approximated.
+**Fix:** The emulated vendor now records every request it receives, and the column reports the
+last one from that side's own test run. If a commit never called the vendor, the run raises
+rather than inventing a receipt.
+
+Two more from the same review, both the same shape:
+
+- A test run producing no vitest summary was reported as `{passed: 0, failed: 0}` — a broken
+  run dressed as a clean one. It now raises: a run that did not happen has not failed zero
+  tests.
+- Copying today's tests into the historical worktree swallowed its errors. Had `cp` failed,
+  the proof would have graded old code against old expectations and presented that as the
+  guarantee. It now raises and says exactly that.
+
+**Lesson:** Every one of these is the same bug wearing different clothes, and it is now the
+fourth time this review has caught it in this project: **an absent or failed result rendered
+as a good one.** `passed !== false`, `testsPassed ? true : null`, a green tick over a failing
+suite, and now a fabricated request. The pattern is not carelessness about error handling —
+it is that the happy path is the one you write first and the one you look at, and every
+shortcut in it defaults toward "fine". Where a human reads the output before doing something
+irreversible, absence has to render as absence.
+
+## 2026-08-30 — Deleting the emulator: the deprecation had already happened
+
+The proof screen ran against an emulated vendor because `gpt-5-mini-2025-08-07`, the model
+`demo-app` was pinned to, does not shut down until 2026-12-11 — it still answers, so there
+was nothing to show. Everything downstream of that choice was scaffolding for a date that
+had not arrived: a stub server, a mutable emulated date, a slider to drag across it.
+
+The same page lists deprecations whose dates have **passed**. Probing the live API:
+
+```
+gpt-5.1-codex-mini   404   Model not found          (shut down 2026-07-23)
+gpt-5.6-terra        200   real completion
+```
+
+and that page names the pair itself: *July 23, 2026 · `gpt-5.1-codex-mini` → `gpt-5.6-terra`*.
+So the emulator was never necessary — we had picked a deprecation from the wrong end of the
+calendar. `demo-app` is now pinned to the retired model, both columns call the real
+`api.openai.com`, and the stub, the emulated date and the time machine are deleted.
+
+Two open Qodo bugs died with the stub rather than being patched: an in-flight run could be
+graded against one emulated date and stamped with another, and two concurrent runs shared
+one call buffer so a column could display the other column's request. Both existed only to
+serve the emulation.
+
+**The commit-picking bug this exposed.** `shas()` chose "the oldest commit introducing the
+new model". With the repo having now migrated *to* `gpt-5.6-terra` twice, that picks the
+first migration, whose parent is pinned to a model that still answers — two green columns,
+and a screen that looks like it worked. It now takes the newest such commit and then
+verifies the parent is actually pinned to the retired model, refusing to render if not.
+That check, not the search heuristic, is what makes the columns trustworthy.
+
+**Lesson:** the honesty problem and the emulation were the same problem. Every fabrication
+risk on that screen — the composed request, the mutable date, the shared buffer, the
+ambiguous commit — existed because the thing being shown had not really happened yet. Make
+it real and they have nothing to attach to.
+
+## 2026-08-30 — Failure paths introduced by the proof UI
+
+Recording these because CLAUDE.md §2.5 asks for it, and because each one is a way the
+screen could be wrong while looking right.
+
+**`saveState()` — proof runner, `scripts/proof-runner.ts`.** Writes `ui/public/last-run.json`
+so a refresh shows the same columns. The write can fail: no disk space, the file made
+read-only, `ui/public/` missing after a clean. It used to be `.catch(() => undefined)`, so
+the run reported success and the next start silently restored an *older* run — or nothing —
+under the same heading, which is the stale-receipt problem the whole PR is about. It now
+logs here instead. It deliberately does **not** throw: the run genuinely happened and the
+columns on screen are real, so losing durability must not delete a true result. The
+observable consequence of a failed write is that a restart shows the previous run, or an
+empty page, never a wrong one.
+
+**`ui/src/lib/trueforge-client.ts` — the UI's transport.** Three calls: read sessions, read
+events, post an approval decision. Every non-2xx response throws `TrueForgeClientError`
+carrying the status; a dead harness throws the underlying network error. Reads propagate to
+`RealAdapter`, which falls back to the frozen `/last-run.json` capture and marks the page as
+offline — a real earlier run, labelled as such. Writes do **not** fall back: a failed
+approval is surfaced to the person who clicked, because a decision that silently does
+nothing leaves them believing they approved a merge that never happened. Separately,
+`MalformedApprovalIdError` marks the one failure that retrying cannot fix — the UI built an
+id without a thread or tool call, which is our bug and not the harness's.
+
+**`demo-app/test/proof-receipt.ts` — the receipt recorder.** Wraps `fetch` during a proof
+run and writes the exchange to `PROOF_RECEIPT`. If that write fails the file is absent, and
+`runSide` throws rather than reporting the run: a missing receipt must not be filled in from
+the previous one. It never records the `Authorization` header, because the receipt is
+written to disk and then rendered in a browser.
