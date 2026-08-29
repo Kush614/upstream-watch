@@ -157,3 +157,40 @@ Second: check what your data provider is *allowed* to fetch before designing aro
 I verified the endpoint, the auth, the request shape and the parse strategy against the real
 page — everything except whether the vendor would serve it at all. That check costs one
 request and I did it on day two instead of day one.
+
+## 2026-08-30 — The agent runs; the local sandbox is the wall
+
+**Where:** TrueForge agent `upstream-watch`, local sandbox provider
+**Symptom:** With the OpenAI provider configured, the skill registered and the agent saved, a
+`check upstream` turn ran and immediately did the right thing — it read
+`agent/targets.yaml` exactly as `agent/prompts/orchestrator.md` instructs. Then every `exec`
+came back with:
+
+```
+Sandbox initialization failed: git ls-remote failed (exit 1):
+  …could be requested (possibly because there is no active GUI session)
+  (skill: brightdata-changelog-scraper)
+```
+
+Removing the skill let the sandbox initialise, and `exec` then worked — but:
+
+```
+/bin/bash: pnpm: command not found                    exit 127
+/bin/bash: /Users/kush/.local/bin/pnpm: Operation not permitted   exit 126
+```
+
+**Cause:** Two faces of the same thing. TrueForge's **local** sandbox is genuinely isolated: it
+denies `/Library/Developer`, so the Xcode `git` shim cannot resolve and the git-backed skill
+install fails; and it refuses to execute binaries from the host toolchain, so `pnpm` is
+unreachable whether or not it is on `PATH`. `git ls-remote` and `pnpm` both work perfectly in
+an ordinary shell — the restriction is the sandbox doing its job.
+
+**Fix:** None locally, and none wanted. This is what Daytona is for, and it is precisely the
+contract `specs/patcher.md` §Steps already describes: clone the repo, `pnpm install
+--frozen-lockfile`, run the tests — in an environment that has a toolchain, rather than
+borrowing the host's.
+
+**Lesson:** The local sandbox looked like a free substitute for the real one and is not. Worth
+saying plainly in the pitch: the sandbox is not decoration and not a checkbox — the moment the
+agent needed to run our code, the isolated environment was the only thing that could, and the
+laptop it was running on was correctly refused.
