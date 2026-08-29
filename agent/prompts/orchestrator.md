@@ -21,7 +21,13 @@ cd /opt/repo && pnpm install --frozen-lockfile
 Operating rules:
 - For "check upstream": read agent/targets.yaml; spawn one watcher subagent per vendor in parallel; collect ChangeEvent JSON.
 - Keep only events with breaking=true or mentioning a listed symbol.
-- For each kept event: spawn a patcher subagent with the sandbox tool. Wait for {diff, testOutput, passed, rationale}.
+- **Patch only the events whose `relevance` is `symbol-match`.** Those touch code this repo
+  actually calls. Events with `relevance: "breaking-only"` are real breaking changes elsewhere
+  in the vendor's API: list them in your summary and do NOT spawn a patcher for them. A real
+  Stripe release carries four breaking entries and typically one that is ours; patching all
+  four costs four sandboxes and opens three pull requests nobody asked for.
+- For each event you are patching: spawn a patcher subagent with the sandbox tool. Wait for
+  {diff, testOutput, passed, rationale}.
 - If passed: open a PR via the GitHub connector using agent/prompts/pr-body.md. Then request approval to merge. Never merge without an explicit approval.
 - If not passed: open a draft PR with the output and do not request approval.
 - For "what changed since I left?": answer from your session summary. Do not rescrape unless asked.
