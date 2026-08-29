@@ -1,5 +1,5 @@
 import express, { type Express, type Request, type Response } from "express";
-import { createStripe, type Charge, type StripeApi } from "./stripe.ts";
+import { createStripe, type PaymentIntent, type StripeApi } from "./stripe.ts";
 
 /**
  * The victim.
@@ -8,8 +8,8 @@ import { createStripe, type Charge, type StripeApi } from "./stripe.ts";
  * small so the whole file fits on a projector, and deliberately real so that patching it
  * is a genuine change rather than a toy edit.
  *
- * The call it depends on — `charges.create` — is the one the watched changelog entry
- * deprecates in favour of `payment_intents.create`.
+ * The call it depends on — `paymentIntents.create` — is the watched Stripe API for
+ * creating card payments.
  */
 
 export interface PaymentRequest {
@@ -22,7 +22,7 @@ export interface PaymentRequest {
 
 export interface PaymentResult {
   id: string;
-  status: Charge["status"];
+  status: PaymentIntent["status"];
   amount: number;
   currency: string;
 }
@@ -47,21 +47,25 @@ export function validatePayment(body: unknown): PaymentRequest {
   return { amountCents, currency, token, description };
 }
 
-/**
- * Charge a card.
- *
- * Uses the Charges API. When Stripe deprecates it, this function and its test are what
- * Upstream Watch has to patch.
- */
+/** Create and confirm a card PaymentIntent from the supplied Stripe.js card token. */
 export async function takePayment(stripe: StripeApi, req: PaymentRequest): Promise<PaymentResult> {
-  const charge = await stripe.charges.create({
+  const paymentIntent = await stripe.paymentIntents.create({
     amount: req.amountCents,
     currency: req.currency.toLowerCase(),
-    source: req.token,
+    payment_method_data: {
+      type: "card",
+      card: { token: req.token },
+    },
+    confirm: true,
     description: req.description ?? DEFAULT_DESCRIPTION,
   });
 
-  return { id: charge.id, status: charge.status, amount: charge.amount, currency: charge.currency };
+  return {
+    id: paymentIntent.id,
+    status: paymentIntent.status,
+    amount: paymentIntent.amount,
+    currency: paymentIntent.currency,
+  };
 }
 
 export function createApp(stripe: StripeApi = createStripe()): Express {
