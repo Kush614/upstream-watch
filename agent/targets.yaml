@@ -2,21 +2,28 @@
 # Referenced by CLAUDE.md §6 (targets_file) and specs/scraper-pipeline.md §5.
 #
 # A changelog entry is acted on only when it is BOTH breaking AND matches a watched
-# path below. Breaking-but-irrelevant entries are recorded and ignored.
+# symbol below. Breaking-but-irrelevant entries are recorded and ignored -- the
+# baseline fixture contains one (`legacy_reporting`) precisely to prove that.
 
 version: 1
 
 targets:
   - vendor: stripe
     name: Stripe API changelog
-    url: https://docs.stripe.com/changelog          # VERIFY exact URL when scraping tonight
+    url: https://docs.stripe.com/changelog          # VERIFY exact URL when scraping in preflight
     # Demo mode reads these instead of hitting Bright Data (CLAUDE.md §5).
-    fixture: agent/fixtures/html/stripe-changelog.html
-    fixture_breaking: agent/fixtures/html/stripe-changelog-breaking.html
+    fixtures:
+      baseline: agent/fixtures/html/stripe-changelog.html
+      breaking: agent/fixtures/html/stripe-changelog-breaking.html
+      restructured: agent/fixtures/html/stripe-changelog-restructured.html
+    extraction_spec: pipeline/extraction-specs/stripe.json
     watches:
-      - path: demo-app/src/**
-        # Symbols we call that this vendor could deprecate. Populated in H1 once
-        # demo-app exists — keep it narrow so relevance matching stays honest.
-        symbols: []                                  # TODO(H1)
+      - path: demo-app/src
+        # API surface we actually call. Matched against entry text, preferring
+        # code-formatted tokens (see specs/scraper-pipeline.md §5).
+        symbols:
+          - source
+          - /v1/charges
+          - Charges API
 
-  # Additional vendors are cut #5 in docs/PLAN.md §6. Do not add any until D1–D7 are green.
+  # Additional vendors are cut #5 in docs/PLAN.md §6. Do not add any until D1-D7 are green.
