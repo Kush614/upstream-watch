@@ -1,0 +1,11 @@
+import type { ScrapeResult, VendorTarget } from "../types.ts";
+
+/**
+ * Every external call goes through a client with a fixture-backed fake (CLAUDE.md §7).
+ *
+ * Implementations must cache the raw HTML before returning (CLAUDE.md §6) and must report
+ * their provenance honestly — `live` means Bright Data actually fetched the page.
+ */
+export interface ScraperClient {
+  scrape(target: VendorTarget): Promise<ScrapeResult>;
+}

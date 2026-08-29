@@ -1,0 +1,129 @@
+{
+  "source": "local",
+  "connected": false,
+  "summary": {
+    "lastCheck": "2026-08-29T22:26:24.150Z",
+    "eventsSeen": 4,
+    "prsOpened": 1,
+    "prsMerged": 0,
+    "pendingApprovals": 1
+  },
+  "steps": [
+    {
+      "id": "s1",
+      "kind": "skill",
+      "label": "skill loaded",
+      "at": "2026-08-29T22:25:32.150Z",
+      "status": "ok",
+      "detail": "brightdata-changelog-scraper"
+    },
+    {
+      "id": "s2",
+      "kind": "scrape",
+      "label": "scrape stripe",
+      "at": "2026-08-29T22:25:36.150Z",
+      "status": "ok",
+      "detail": "40 entries · cache"
+    },
+    {
+      "id": "s3",
+      "kind": "diff",
+      "label": "diff: 4 changes",
+      "at": "2026-08-29T22:25:40.150Z",
+      "status": "ok",
+      "detail": "21 new since last run"
+    },
+    {
+      "id": "s4",
+      "kind": "subagent",
+      "label": "subagent: patcher",
+      "at": "2026-08-29T22:25:46.150Z",
+      "status": "ok"
+    },
+    {
+      "id": "s5",
+      "kind": "sandbox",
+      "label": "sandbox provisioned",
+      "at": "2026-08-29T22:25:48.150Z",
+      "status": "ok",
+      "detail": "patch + test run in isolation"
+    },
+    {
+      "id": "s6",
+      "kind": "tests",
+      "label": "tests: pass",
+      "at": "2026-08-29T22:26:12.150Z",
+      "status": "ok",
+      "detail": "14 passed"
+    },
+    {
+      "id": "s7",
+      "kind": "pr",
+      "label": "pr opened",
+      "at": "2026-08-29T22:26:18.150Z",
+      "status": "ok"
+    },
+    {
+      "id": "s8",
+      "kind": "approval",
+      "label": "waiting for approval to merge",
+      "at": "2026-08-29T22:26:20.150Z",
+      "status": "warn"
+    }
+  ],
+  "pending": [
+    {
+      "id": "apr_1",
+      "action": "merge_pull_request",
+      "entry": {
+        "vendor": "stripe",
+        "date": "2026-08-26",
+        "title": "Removes support for specifying payment method types in Payment Intents and Setup Intents",
+        "body": "Removes `payment_method_types` as a writable parameter from the [create](/api/payment_intents/create?api-version=2026-08-26.preview), [update](/api/payment_intents/update?api-version=2026-08-26.preview), and [confirm](/api/payment_intents/confirm?api-version=2026-08-26.preview) methods on Payment Intents, and from the [create](/api/setup_intents/create?api-version=2026-08-26.preview) and [update](/api/setup_intents/update?api-version=2026-08-26.preview) methods on Setup Intents. Passing `payment_method_types` now returns a 400 error with the code `payment_method_types_no_longer_supported`. The [PaymentIntent](/api/payment_intents/object?api-version=2026-08-26.preview#payment_intent_object-payment_method_types) and…",
+        "url": "https://docs.stripe.com/changelog/dahlia#removes-payment-method-types-parameter-from-payment-intents-setup-intents",
+        "breaking": true,
+        "symbols": [
+          "payment_intents",
+          "PaymentIntent#create"
+        ]
+      },
+      "files": [
+        "demo-app/src/payments.ts"
+      ],
+      "diff": "--- a/demo-app/src/payments.ts\n+++ b/demo-app/src/payments.ts\n@@ -25,3 +25,3 @@\n-  status: PaymentIntent[\"status\"];\n+  status: PaymentIntent[\"<vendor-recommended replacement>\"];\n   amount: number;",
+      "testsPassed": true,
+      "testOutput": "Test Files 1 passed (1)\n     Tests 14 passed (14)",
+      "prUrl": "https://github.com/Kush614/upstream-watch/pull/4",
+      "prNumber": 4
+    }
+  ],
+  "done": [
+    {
+      "id": "d0",
+      "vendor": "stripe",
+      "title": "Adds support for disabling payout methods",
+      "prUrl": "https://docs.stripe.com/changelog/dahlia#disable-payout-methods",
+      "prNumber": 0,
+      "status": "open",
+      "at": "2026-08-26T00:00"
+    },
+    {
+      "id": "d1",
+      "vendor": "stripe",
+      "title": "Includes deleted prices in trial offer price data",
+      "prUrl": "https://docs.stripe.com/changelog/dahlia#trial-offers-return-deleted-prices",
+      "prNumber": 0,
+      "status": "open",
+      "at": "2026-08-26T00:00"
+    },
+    {
+      "id": "d2",
+      "vendor": "stripe",
+      "title": "Updates bank account and payout method resources for Global Payouts",
+      "prUrl": "https://docs.stripe.com/changelog/dahlia#updates-v2-payout-method-and-vault-bank-account-resources",
+      "prNumber": 0,
+      "status": "open",
+      "at": "2026-08-26T00:00"
+    }
+  ]
+}

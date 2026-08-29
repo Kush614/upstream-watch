@@ -246,38 +246,31 @@ plan is smarter than the builder is at 16:00.
 
 ## 6. Cut order
 
-**Cut from the top.** Never cut out of order — the ordering is chosen so that each cut costs the
-fewest judging points per hour recovered.
+From the spec bundle. **Cut from the top**; the ordering is the author's, chosen so each cut
+costs the fewest judging points per hour recovered.
 
-| # | Cut | Recovers | Costs us |
-| --- | --- | --- | --- |
-| 1 | **D7 self-repair against live Bright Data.** Demo the repair against cached HTML only. | ~45m | The surprise beat; some Bright Data depth |
-| 2 | **Self-repair opens a PR** → it logs the proposed spec change instead. | ~20m | A nice-to-have; the detection is what matters |
-| 3 | **Second UI panel ("Did" panel).** Approval card only. | ~20m | Some polish |
-| 4 | **Both custom UI panels.** Use stock `trueforge-ui` approval UI. | ~50m | UI polish. **Approval still demoed** — that is what counts |
-| 5 | **Multi-vendor targets.** Stripe only, hardcoded. | ~20m | Generality (talk about it instead) |
-| 6 | **Real test run in the sandbox** → sandbox runs typecheck only. | ~25m | Some credibility; sandbox criterion still met |
-| 7 | **Live Bright Data entirely.** `DEMO_MODE=1` for the whole demo, disclosed honestly. | ~30m | Bright Data track. Say so out loud rather than implying live |
+| # | Cut | Status today |
+| --- | --- | --- |
+| 1 | Second vendor → Stripe only | already the case |
+| 2 | Dynamic subagents → one agent doing watcher + patcher sequentially | available |
+| 3 | Live self-repair → pre-recorded clip + cached repaired spec | detection + gate work offline, so this is cheap to keep |
+| 4 | Custom UI panels → stock `trueforge-ui` | **no longer needed** — panels are built and `trueforge-ui` is published |
+| 5 | Reconnect demo | 10 seconds; keep |
 
 ### Never cut
 
-These are the scored core. If the day collapses, the demo is these five and nothing else:
-
-- **The approval gate** (D4) — the thesis of the project.
-- **One real GitHub PR via GitHub MCP** (D3) — proves real tool use.
-- **The patcher subagent in a Daytona sandbox** (D2) — proves subagents + sandboxing.
-- **Session persistence across a refresh** (D5) — proves the harness, and takes 10 seconds.
-- **A Qodo-reviewed merged PR + the README evidence section** — the entire Q Branch track,
-  and it cannot be reconstructed after the fact.
+- **The approval gate** — the thesis.
+- **A real GitHub PR** via the GitHub MCP connector.
+- **A Qodo review on that PR** — the Q Branch track, unreconstructable after the fact.
+- **Cached demo mode** — the "everything on fire" fallback. `DEMO_MODE=1` replays the
+  committed real capture.
 
 ### If it is 17:00 and nothing works
 
-Fall back to the honest minimum: run the pipeline on fixtures in the terminal, show the detected
-breaking change, show the PR the agent opened earlier in the day, show the approval card, and
-say plainly which parts are live and which are cached. A working small demo, honestly narrated,
-outscores a broken ambitious one.
-
----
+`pnpm demo:rewind && DEMO_MODE=1 pnpm check` shows real Stripe breaking changes mapped to
+real files, `pnpm demo:break-page` shows the mismatch-and-repair path, and `pnpm demo:feed &&
+pnpm ui` shows the approval card. All three run with no accounts at all. Narrate honestly
+which parts are live.
 
 ## 7. Risk register
 
@@ -294,17 +287,33 @@ outscores a broken ambitious one.
 
 ---
 
-## 8. Open questions (`VERIFY` before relying on any of these)
+## 8. Open questions
 
-Carried from `CLAUDE.md` §4 and §6. Every one of these is currently a guess:
+Answered today:
 
-1. Exact GitHub MCP server name in the TrueForge connector catalog, and its tool names.
-2. Whether TrueForge local mode needs an API key for its HTTP API.
-3. The Bright Data Scraper Studio CLI command and flags (`CLAUDE.md` §6 TODO).
-4. Whether `@truefoundry/trueforge-ui` is publishable/embeddable standalone, or whether the
-   custom panels have to live inside the harness UI. **If this is wrong, cut #4 fires early.**
-5. How TrueForge approval checkpoints are declared — agent config, tool metadata, or SDK call.
-6. Whether a saved agent's session survives a full harness restart, or only a browser refresh.
-   D5 claims the former; verify tonight, and weaken the claim in `docs/DEMO.md` if it is false.
+1. ~~GitHub MCP server name~~ — **answered.** `github`, at
+   `https://api.githubcopilot.com/mcp/`, header-PAT auth. Configured and authenticated;
+   `merge_pull_request` confirmed among its 44 tools.
+2. ~~TrueForge local mode API key~~ — not needed for the panels; `adapter.ts` talks to
+   `/api/v1/...` unauthenticated on localhost.
+3. ~~Bright Data CLI command~~ — **answered.** `POST https://api.brightdata.com/request`
+   with `{zone, url, format: "raw"}` and a Bearer token. Recorded in `CLAUDE.md` §6 and
+   implemented in `pipeline/src/clients/brightdata.ts`.
+4. ~~Is `@truefoundry/trueforge-ui` embeddable standalone?~~ — **answered: yes.** Published
+   at 0.2.4. Cut #4 is off the table.
+5. ~~How are approval checkpoints declared?~~ — **fully answered.** Configured per MCP
+   server via `MCPServerApprovalToolSelector` (`@all` / `@write` / `@destructive` / a tool
+   name). Pending approvals are not a REST resource: they arrive as `tool.approval_required`
+   events on `GET /api/v1/sessions/{id}/events` and are answered by posting a
+   `user.tool_approval` item to `POST /api/v1/sessions/{id}/turns`. Implemented.
+6. Does a saved agent's session survive a full harness restart, or only a browser refresh?
+   Still open. `docs/DEMO.md` claims the former — weaken the claim if it turns out to be false.
 
-Answer each in the relevant `specs/*.md` as you verify it, and delete it from this list.
+Still unverified:
+
+- **Daytona sandbox provisioning.** The route exists — `PUT /api/v1/settings/sandbox-providers`,
+  and `GET /api/v1/catalogs/sandbox-providers` returns
+  `{"type":"daytona","exec_timeout_ms":60000,…}` — so this is configurable from the terminal
+  too. It needs a `DAYTONA_API_KEY`, which is the one thing still outstanding.
+- **A model provider.** `POST /api/v1/settings/model-providers` needs an
+  `OPENAI_API_KEY`. Without it the agent can be created but not run.

@@ -55,7 +55,9 @@ upstream-watch/
 
 - **Harness:** TrueForge local mode — `npx @truefoundry/trueforge` → http://localhost:8790. Node 22+. SQLite.
 - **Model:** OpenAI (hackathon credits) via TrueForge Settings → Models. Fallback: Anthropic key if configured.
-- **Tools (MCP):** GitHub MCP via OAuth (Settings → Connectors). VERIFY exact server name in catalog.
+- **Tools (MCP):** GitHub MCP, catalog name `github`, `https://api.githubcopilot.com/mcp/`.
+  Auth is a **header PAT, not OAuth** — configurable from the terminal with `gh auth token`
+  (see `specs/agent.md` §Connector). Gated tool: `merge_pull_request`.
 - **Sandbox:** Daytona (Settings → Sandbox providers). Sandbox is provisioned only for patch+test turns.
 - **Web data:** Bright Data Scraper Studio, driven from the terminal. Config in `skills/brightdata-changelog-scraper/SKILL.md`.
 - **API/SDK:** TrueForge HTTP API (REST + SSE, docs at `http://localhost:8790/api/v1/docs`), `@truefoundry/trueforge-core` (TS SDK).
@@ -69,6 +71,7 @@ upstream-watch/
 cp .env.example .env            # fill keys
 pnpm install
 npx @truefoundry/trueforge       # terminal 1 — harness on :8790
+./scripts/setup-harness.sh       # configure it: model, connector, skill, sandbox, agent
 pnpm --filter pipeline dev       # terminal 2 — scraper runner
 pnpm --filter ui dev             # terminal 3 — custom UI on :5173
 pnpm demo:seed                   # loads fixtures + seeded breaking change
@@ -76,30 +79,99 @@ pnpm demo:seed                   # loads fixtures + seeded breaking change
 
 Demo mode: `DEMO_MODE=1` makes the pipeline serve cached HTML from `agent/fixtures/` instead of hitting Bright Data. Always rehearse with this ON first, then OFF.
 
+Commands the agent and the demo actually use:
+
+```bash
+pnpm check                          # one pass over every vendor, rendered for a human
+pnpm scrape --vendor stripe         # same run, ChangeEvent JSON on stdout (the agent reads this)
+pnpm scrape -- --no-persist         # inspect without recording entries as seen
+pnpm repair --vendor stripe         # build repair-context.json after a SchemaMismatch
+pnpm validate-spec --vendor stripe --spec <file>   # gate a proposed extraction spec
+pnpm verify                         # typecheck + tests; what the patcher runs in the sandbox
+pnpm pr:body                        # JSON on stdin -> PR title + body on stdout
+pnpm ui                             # the three panels on :5173
+pnpm demo:feed                      # write ui/public/session.json from a real scrape
+pnpm demo:rewind --since 2026-08-20 # forget a release so real entries show as new
+pnpm demo:break-page                # swap in the restructured page; demo:restore-page undoes it
+```
+
+**Live is the default.** `DEMO_MODE=1` opts *out*, replaying the cached `current.html` —
+the fallback in `docs/PLAN.md`, not the normal path.
+
+`scripts/setup-harness.sh` is the TrueForge quickstart's seven browser steps done over its
+REST API, reading keys from `.env`. It is idempotent — re-run it after adding a missing key
+and it configures only what is absent. The GitHub connector is header-PAT auth, so it wires
+itself from `gh auth token`; no OAuth round-trip is involved.
+
 ## 6. Bright Data scraper settings (rules for the coding assistant)
 
 These settings are reused automatically by Claude Code. Do not ask the user for them.
 
 ```yaml
-# Bright Data — Scraper Studio
+# Bright Data — Web Unlocker API
 provider: brightdata
-tool: scraper-studio            # driven via CLI, never via dashboard during the day
-auth: env:BRIGHTDATA_API_KEY
-zone: env:BRIGHTDATA_ZONE       # VERIFY zone name from Bright Data setup
+tool: web-unlocker                # POST https://api.brightdata.com/request
+auth: env:BRIGHTDATA_API_KEY      # Authorization: Bearer <key>
+zone: env:BRIGHTDATA_ZONE
 output: json
 schema: schemas/changelog-entry.json   # {vendor, date, title, body, url, breaking: bool}
 retry: 3
-on_schema_mismatch: repair      # see specs/scraper-pipeline.md §4
-cache_dir: agent/fixtures/html
+on_schema_mismatch: repair        # see specs/scraper-pipeline.md §4
+cache_dir: agent/fixtures/html/<vendor>/   # newest 5 kept, plus current.html + last-good.html
 targets_file: agent/targets.yaml
+extraction_specs: skills/brightdata-changelog-scraper/SKILL.md   # the YAML block
 ```
+
+Working invocation, verified against
+<https://docs.brightdata.com/scraping-automation/web-unlocker/send-your-first-request>:
+
+```bash
+curl -X POST https://api.brightdata.com/request \
+  -H "Authorization: Bearer $BRIGHTDATA_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"zone":"'"$BRIGHTDATA_ZONE"'","url":"https://docs.stripe.com/changelog","format":"raw"}'
+```
+
+`pipeline/src/clients/brightdata.ts` issues exactly that request.
+
+**Two vendors, two provenances.** Bright Data's compliance policy refuses `docs.stripe.com`
+(`policy_20050` — payments domains are KYC-gated), so Stripe carries `source: cache` in
+`agent/targets.yaml` and is watched from a committed real capture. **Cloudflare is scraped
+live.** Every run prints which is which, and so does every PR body. See NOTES.md 2026-08-30.
+
+Extraction spec, mirrored from `skills/brightdata-changelog-scraper/SKILL.md` (change both
+in the same commit):
+
+```yaml
+vendors:
+  stripe:
+    url: https://docs.stripe.com/changelog
+    strategy: embedded-json       # Stripe ships entries as JSON, not markup — see below
+    json:
+      marker: "window.__INITIAL_STATE__ = "
+      entries_path: "article.content.children[].attributes.releaseTrains[].releases[].changelogEntries[]"
+      map:
+        date: "release"
+        title: "title[0]"
+        body: ["description", "impact", "changed", "affected"]
+        url: "https://docs.stripe.com/changelog/{train}#{slug}"
+        breaking: "breaking"
+    breaking_hint: ["deprecat", "removed", "breaking", "no longer"]
+```
+
+**Why `strategy: embedded-json`.** Stripe server-renders 880 changelog entries into
+`window.__INITIAL_STATE__`, and its CSS class names are build-hashed (`sn-1iugkao`), so
+selector-based extraction cannot reach the data and would break on every deploy. The JSON
+is also strictly better: Stripe publishes its own `breaking` boolean and the exact API
+symbols each entry changes, so we match on `PaymentIntent#create` rather than guessing from
+prose. `strategy: css` remains the default for vendors that render entries as HTML.
 
 Rules:
 - Every scrape writes raw HTML to `cache_dir` before parsing. Never parse without caching.
 - A scrape that returns 0 entries or fails schema validation is a **change event**, not an error. Trigger self-repair.
 - Self-repair edits the extraction spec, re-runs against cached HTML, and only then against live. It opens a PR for the spec change; it does not silently mutate config.
-- CLI invocation and flags: VERIFY against Bright Data getting-started doc and record the working command here:
-  `# TODO: paste working command, e.g. brightdata scrape --zone $ZONE --url <url> --schema schemas/changelog-entry.json`
+- The working CLI invocation is recorded above and implemented in
+  `pipeline/src/clients/brightdata.ts`.
 
 ## 7. Coding conventions
 

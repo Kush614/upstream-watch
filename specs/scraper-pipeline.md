@@ -24,31 +24,57 @@ Each stage is one file under `pipeline/src/`. One concern per file (`CLAUDE.md` 
 Output conforms to `schemas/changelog-entry.json`:
 `{ vendor, date, title, body, url, breaking }`.
 
-`breaking` classification — **TODO**, decide and document: keyword heuristics
-(deprecat*/remov*/breaking/no longer), the vendor's own labels, or a model call. Prefer the
-cheapest thing that works on the fixture; note the choice here.
+`breaking` classification — **decided: keyword heuristic**, in `pipeline/src/lib/classify.ts`.
+Six signals (`breaking-change`, `deprecated`, `will-be-removed`, `no-longer`, `must-migrate`,
+`renamed`), any one of which flags the entry. Chosen over a model call because it is
+deterministic, free, testable offline, and auditable on camera — a judge can read the regexes.
+
+The cost is precision, and we accept it: a false positive costs a PR nobody merges, and the
+approval gate catches it. Revisit only if the fixture shows a miss. `classify()` returns the
+signals that fired, and they are printed in the PR body so a human can check the reasoning.
 
 ## 4. Self-repair
 
 **A scrape that returns 0 entries or fails schema validation is a change event, not an error**
 (`CLAUDE.md` §6). Vendors redesign their changelog pages; that is signal.
 
-1. Detect: 0 entries, or a schema failure.
+**Partial failures count too.** If some entries validate and some do not, the run continues on
+the ones it can read *and* emits an `extraction-broken` event with `partial: true`. Carrying on
+quietly would drop the invalid entries — and a newly added breaking entry is exactly the kind
+that is malformed first, so it could stay invisible indefinitely.
+
+1. Detect: 0 entries, a schema failure, or any invalid entry alongside valid ones.
 2. Re-run the extraction against the **cached** HTML — cheap, offline, repeatable.
 3. Propose a new extraction spec.
 4. Validate the proposal against the cached HTML.
 5. Only then re-run live.
 6. **Open a PR for the spec change. Never silently mutate config** (`CLAUDE.md` §6).
 
-Guard against loops: at most **one** repair attempt per target per run. **TODO:** confirm and
-implement the cap.
+Guard against loops: at most **one** repair attempt per target per run —
+`MAX_REPAIRS_PER_RUN` in `pipeline/src/run.ts`.
+
+`proposeExtractionSpec()` (`pipeline/src/lib/repair.ts`) works by reading the cached HTML:
+it ranks repeated `tag.class` containers, derives field selectors from what the first one
+actually contains (a date-shaped attribute or child, the first heading, the largest non-heading
+text block, the first anchor), then **scores each candidate by how many schema-valid entries it
+actually yields** and keeps the best. It returns `null` rather than guessing when nothing
+validates. It never writes: the proposal goes into a PR.
 
 ## 5. Diff + relevance
 
-- Diff new entries against last seen. **TODO:** where last-seen state lives (SQLite via the
-  harness? a JSON file in `pipeline/`?). Decide before H2.
+- Diff new entries against last seen. **Decided:** a gitignored JSON file at
+  `.upstream-watch/state.json` (`pipeline/src/lib/state.ts`), not the harness's SQLite — the
+  pipeline runs as a plain script, and local state means `pnpm demo:seed` resets the demo by
+  deleting one file. Entry identity is the vendor's own permalink.
+- **First run baselines silently.** Everything looks new the first time; reporting a vendor's
+  whole backlog as breaking news would be noise, so `firstRun` suppresses events.
 - Relevance: match the entry against `agent/targets.yaml` → the watched code paths. An entry
-  that is breaking but touches nothing we call is recorded and **not** acted on.
+  that is breaking but touches nothing we call is recorded and **not** acted on. The baseline
+  fixture contains one such entry (`legacy_reporting`) specifically to keep this path tested.
+- Matching prefers **code spans over prose**: `parse.ts` rewrites `<code>` into backticked
+  tokens, and `relevance.ts` reports `how: "code"` for a match inside one and `how: "text"` for
+  a bare prose match. This is what stops the symbol `source` matching the English word, or
+  matching inside `resource_id`.
 
 ## 6. Clients + tests
 

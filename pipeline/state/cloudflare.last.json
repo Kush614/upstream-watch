@@ -1,0 +1,31 @@
+{
+  "vendor": "cloudflare",
+  "lastCheck": "2026-08-29T22:25:25.405Z",
+  "seen": [
+    "2026-08-30::AI Search now supports GLM-5.3 Flash",
+    "2026-08-28::Cloudflare One Client for macOS (version 2026.7.1376.0)",
+    "2026-08-28::Cloudflare One Client for Windows (version 2026.7.1376.0)",
+    "2026-08-28::Cloudflare One Client for Linux (version 2026.7.1377.0)",
+    "2026-08-28::Z.ai GLM-5.3 now available on Workers AI",
+    "2026-08-28::Durable Objects can use up to ten Dynamic Workers concurrently",
+    "2026-08-26::Access service token secrets use a scannable format",
+    "2026-08-26::New Workers AI text generation models in AI Search",
+    "2026-08-26::Create app-scoped API tokens for Flagship",
+    "2026-08-26::Delete Log Explorer datasets",
+    "2026-08-26::Azure Functions-based Microsoft Sentinel connector deprecation",
+    "2026-08-26::Radar Researcher adds richer sources and URL Scanner explanations",
+    "2026-08-26::WAF Release - 2026-08-26 - Emergency",
+    "2026-08-26::Z.ai GLM-5.3 Flash now available on Workers AI",
+    "2026-08-25::Grace periods for service token rotation",
+    "2026-08-25::Temporarily turn off Access service tokens",
+    "2026-08-25::Store larger custom metadata values in AI Search",
+    "2026-08-25::Symmetric key support for JWT validation",
+    "2026-08-25::MCP server portals support MCP 2026-07-28 specification",
+    "2026-08-25::Prevent Durable Object alarm retries when using `ctx.abort()`",
+    "2026-08-25::WAF Release - 2026-08-25",
+    "2026-08-25::WAF Release - Scheduled changes for 2026-09-01",
+    "2026-08-24::Download the Cloudflare One Virtual Appliance for your hypervisor from the dashboard",
+    "2026-08-24::RPKI ASPA path validation on Cloudflare Radar",
+    "2026-08-22::Choose OAuth scopes for Wrangler and the Cloudflare API MCP server"
+  ]
+}

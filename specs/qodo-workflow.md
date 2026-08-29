@@ -1,47 +1,36 @@
-# SPEC — Qodo workflow
+# Spec: Qodo workflow (Code Quality track)
 
-> Status: **skeleton**. This is the entire **Q Branch** track (Best Code Quality, Mac Mini) and
-> it **cannot be reconstructed after the fact** — the PR history is the proof.
+## Setup (tonight)
+Qodo → Integrations → SaaS → GitHub → Add installation → authorize repo. Confirm repo active in Qodo. First PR: `chore: repo skeleton` → `/agentic_review` if it doesn't auto-run.
 
-## Non-negotiable
+## Every PR
+1. Branch from `main`. Keep diff < 300 lines.
+2. Open PR with description (Qodo describe tool ok).
+3. Wait for review. Fix all valid **High**. Judge **Medium/Low**; fix cheap ones.
+4. Dismiss invalid/deferred findings *in the Qodo thread* with one-line reason. Silence looks like ignoring.
+5. Push fixes → `/agentic_review` again if needed. Merge.
 
-`CLAUDE.md` §2.1 — **no direct pushes to `main`.** Direct pushes do not count as reviewed work.
+Agent-generated PRs (patches and scraper repairs) follow the same flow. This is a pitch point: the agent's code is held to the same bar.
 
-## Per-change loop
+Optional accelerator: `npx skills add qodo-ai/qodo-skills/skills` → use `qodo-pr-resolver` to fix findings.
 
-1. Branch off `main` (`CLAUDE.md` §8: `feat/pipeline`, `feat/agent`, `feat/ui`, `feat/demo`).
-2. Implement. Add or update a fixture-backed Vitest test if `pipeline/` is touched
-   (`CLAUDE.md` §7).
-3. Commit as `feat|fix|chore|docs(scope): summary`.
-4. Open a PR. **Keep it under ~300 lines** — Qodo and humans both review small PRs better.
-5. Qodo reviews automatically. If it does not respond within a few minutes, comment
-   `/agentic_review`.
-6. **Fix every valid High.** Use judgement on Medium/Low. If a finding is wrong, deferred, or
-   expected, **dismiss it in the Qodo thread with a written reason** — a dismissal with a
-   reason is evidence of engagement; a silent dismissal is not.
-7. Push fixes to the same PR, re-run `/agentic_review` if needed.
-8. Merge. Append anything that broke to `NOTES.md` (`CLAUDE.md` §10).
+## README section (required, exact heading)
+```
+## Qodo Code Review Evidence
+- Representative PR: <public link to a merged PR with meaningful code>
+- What Qodo found / what changed or was dismissed: <1–2 lines>
+- Review history: <link to PR conversation showing review + follow-up>
+```
+Judges may check other merges. Aim for every merged PR to show a Qodo comment.
 
-## Evidence section (README)
+## Record so far
 
-Required, and worth writing *as PRs merge* rather than at 17:30:
+4 PRs, **16 findings, 0 dismissed as invalid** (one dismissed as a false positive, with three
+independent proofs). Follow-up reviews: #1 2→1, #2 7→0, #3 5→0, #4 2→0 pending re-review.
+Sharpest catches: a vendor-controlled changelog title interpolated into a Markdown heading in a
+PR a human was about to approve, and a last-good regression check that compared a candidate
+against its own output and so could never fail.
 
-- A link to at least one **representative merged PR** with meaningful hackathon code.
-- 1–2 lines on what Qodo found and what was changed or intentionally dismissed.
-- The PR history showing the review and the follow-up review.
-
-The **public PR link is the required proof**. Screenshots add context but cannot replace it.
-Judges may check other merges to confirm Qodo was part of the process rather than a one-time
-step at the end — so run it on every meaningful PR, starting with the first one.
-
-## If Qodo goes quiet
-
-1. Confirm the GitHub App has access to this repository.
-2. Confirm the repository is active in Qodo.
-3. Comment `/agentic_review` on the PR.
-4. Still nothing → `NOTES.md`, and raise it early. Do not discover this at 16:00.
-
-## Optional
-
-`npx skills add qodo-ai/qodo-skills/skills` provides a `qodo-pr-resolver` skill for working
-through findings with a coding agent.
+## "Someone could clone, understand, extend"
+- README: what it is, architecture diagram (from docs/ARCHITECTURE.md), how to run, how to add a vendor (edit `targets.yaml` + SKILL.md block), demo mode.
+- Prompts in files. Clients typed. Tests fixture-backed. `.env.example` complete.

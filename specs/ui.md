@@ -1,49 +1,36 @@
-# SPEC — UI
+# Spec: UI
 
-> Status: **skeleton**. Cut #3/#4 in `docs/PLAN.md` §6 — if this slips past 15:45, fall back to
-> the stock TrueForge approval UI. **A stock approval that works beats a custom panel that
-> half-renders.**
+Track criteria: a stranger could drive it; shows what the agent is doing, what it's waiting on, what it did; asks before the irreversible step.
 
-`ui/` embeds `@truefoundry/trueforge-ui` and adds two panels.
+## Base
+`ui/` is a Vite + React app embedding `@truefoundry/trueforge-ui` pointed at `TRUEFORGE_URL`. Stock chat + agent-steps panel come free (streamed reasoning, tool calls, subagents). Do not rebuild these.
 
-## Panel 1 — Approval card (**required**)
+## Three panels (layout: chat center, panels right)
 
-The screenshot that goes in the submission. This is D4, the thesis of the project.
+### Doing
+- Source: `GET /api/v1/sessions/{id}/events` (verified against a running server). SSE per turn
+  is at `/turns/{turn_id}/subscribe`; the panel currently polls the session events route.
+- Render step list: `skill loaded`, `scrape stripe`, `diff: 1 breaking`, `subagent: patcher`, `sandbox: provisioned (Daytona)`, `tests: pass`, `pr: #12`.
+- Sandbox provision shown as a distinct badge — this is a pitch beat.
 
-```
-┌────────────────────────────────────────────────────────────┐
-│  Stripe · 2026-08-28 · BREAKING                            │
-├───────────────────────────────┬────────────────────────────┤
-│  CHANGELOG                    │  PROPOSED PATCH            │
-│  "The `foo` parameter is      │  - api.charge({ foo: 1 })  │
-│   deprecated and will be      │  + api.charge({ bar: 1 })  │
-│   removed..."                 │                            │
-│   ↗ source                    │  ✓ demo-app tests pass     │
-├───────────────────────────────┴────────────────────────────┤
-│  PR #12 ↗                            [ Reject ] [ Approve ]│
-└────────────────────────────────────────────────────────────┘
-```
+### Waiting on
+- Source: `tool.approval_required` events on the session stream — **approvals are not a REST
+  resource**. Answered by posting a `user.tool_approval` item to
+  `POST /api/v1/sessions/{id}/turns` with `{"status":"allow"}` or
+  `{"status":"deny","reason":"…"}`. All of this lives in `ui/src/adapter.ts`.
+- Controls are disabled when there is no live session, so the card cannot look actionable
+  while reading the local feed.
+- Approval card: left = changelog excerpt (vendor, date, title, ≤ 40 words body, link); right = code diff (syntax-highlighted); footer = test result badge + PR link + **Approve** / **Reject with reason**.
+- Card must render identically after a full page refresh (reconnect test).
 
-Requirements: changelog excerpt **with its source URL**; the code diff; the test result; a link
-to the real PR; Approve and **Reject** (the reject path gets demoed too).
+### Did
+- Source: session summary / tool results.
+- List of PRs with status (open / merged / draft), vendor, timestamp. Click → GitHub.
 
-## Panel 2 — "Did" panel (nice to have)
+## Stranger test
+A judge who has never seen it should be able to: click "Check upstream", read the three panels, and press Approve. No config exposed. One primary button per state.
 
-What the watch has actually done: entries seen, PRs opened, what is awaiting approval, what was
-rejected and why. Reverse-chronological. This is what makes it feel like a *watch* rather than
-a one-shot script.
-
-## Constraints
-
-- Reads state from the TrueForge HTTP API (REST + SSE, `http://localhost:8790/api/v1/docs`).
-- **Must survive a hard refresh mid-approval** — that is D5, and it is 10 seconds of demo for
-  a whole scored capability.
-- Legible on a projector at 1080p. Big type. No hover-only affordances.
-
-## VERIFY
-
-- [ ] Is `@truefoundry/trueforge-ui` embeddable standalone, or must panels live inside the
-      harness UI? **If standalone embedding does not work, cut #4 fires immediately** — do not
-      spend the afternoon fighting it.
-- [ ] Which API endpoint exposes a pending approval and its payload.
-- [ ] Whether SSE gives live updates or the panel must poll.
+## Scope guard
+If by 15:45 panels aren't rendering from live data, ship stock trueforge-ui + the approval card
+only (cut order §4). **Status: not needed.** `@truefoundry/trueforge-ui` is published (0.2.4)
+and all three panels are built; the remaining work is embedding the stock chat alongside them.

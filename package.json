@@ -8,9 +8,20 @@
   },
   "packageManager": "pnpm@10.13.0",
   "scripts": {
+    "check": "pnpm --filter pipeline scrape -- --pretty",
+    "scrape": "pnpm --filter pipeline scrape",
+    "repair": "pnpm --filter pipeline repair",
+    "validate-spec": "pnpm --filter pipeline validate-spec",
+    "pr:body": "pnpm --filter pipeline pr:body",
+    "verify": "pnpm -r typecheck && pnpm -r test",
+    "demo:break-page": "node --env-file-if-exists=.env --experimental-strip-types scripts/break-page.ts",
+    "demo:restore-page": "node --env-file-if-exists=.env --experimental-strip-types scripts/break-page.ts --restore",
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",
-    "demo:seed": "pnpm --filter pipeline demo:seed"
+    "demo:rewind": "node --env-file-if-exists=.env --experimental-strip-types scripts/rewind-state.ts",
+    "demo:feed": "node --env-file-if-exists=.env --experimental-strip-types scripts/build-feed.ts",
+    "ui": "pnpm --filter ui dev",
+    "demo:seed": "node --env-file-if-exists=.env --experimental-strip-types scripts/seed.ts"
   },
   "devDependencies": {
     "typescript": "^5.6.0",
