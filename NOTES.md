@@ -450,3 +450,39 @@ suite, and now a fabricated request. The pattern is not carelessness about error
 it is that the happy path is the one you write first and the one you look at, and every
 shortcut in it defaults toward "fine". Where a human reads the output before doing something
 irreversible, absence has to render as absence.
+
+## 2026-08-30 — Deleting the emulator: the deprecation had already happened
+
+The proof screen ran against an emulated vendor because `gpt-5-mini-2025-08-07`, the model
+`demo-app` was pinned to, does not shut down until 2026-12-11 — it still answers, so there
+was nothing to show. Everything downstream of that choice was scaffolding for a date that
+had not arrived: a stub server, a mutable emulated date, a slider to drag across it.
+
+The same page lists deprecations whose dates have **passed**. Probing the live API:
+
+```
+gpt-5.1-codex-mini   404   Model not found          (shut down 2026-07-23)
+gpt-5.6-terra        200   real completion
+```
+
+and that page names the pair itself: *July 23, 2026 · `gpt-5.1-codex-mini` → `gpt-5.6-terra`*.
+So the emulator was never necessary — we had picked a deprecation from the wrong end of the
+calendar. `demo-app` is now pinned to the retired model, both columns call the real
+`api.openai.com`, and the stub, the emulated date and the time machine are deleted.
+
+Two open Qodo bugs died with the stub rather than being patched: an in-flight run could be
+graded against one emulated date and stamped with another, and two concurrent runs shared
+one call buffer so a column could display the other column's request. Both existed only to
+serve the emulation.
+
+**The commit-picking bug this exposed.** `shas()` chose "the oldest commit introducing the
+new model". With the repo having now migrated *to* `gpt-5.6-terra` twice, that picks the
+first migration, whose parent is pinned to a model that still answers — two green columns,
+and a screen that looks like it worked. It now takes the newest such commit and then
+verifies the parent is actually pinned to the retired model, refusing to render if not.
+That check, not the search heuristic, is what makes the columns trustworthy.
+
+**Lesson:** the honesty problem and the emulation were the same problem. Every fabrication
+risk on that screen — the composed request, the mutable date, the shared buffer, the
+ambiguous commit — existed because the thing being shown had not really happened yet. Make
+it real and they have nothing to attach to.

@@ -35,7 +35,7 @@ vendors:
     # the replacement: its future deprecation would be classified breaking-only and never
     # patched. specs/patcher.md forbids the patcher touching this file, so the orchestrator
     # keeps it in step — see specs/agent.md §The loop.
-    symbols: [gpt-5.6-terra, gpt-5-mini-2025-08-07, gpt-5-mini, v1/prompts, chat/completions]
+    symbols: [gpt-5.1-codex-mini, gpt-5.6-terra, gpt-5-mini-2025-08-07, gpt-5-mini, v1/prompts, chat/completions]
     files: [demo-app/src/risk.ts]
 
   slack:

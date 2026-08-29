@@ -1,22 +1,15 @@
 import { describe, it, expect } from "vitest";
-import { currentPhase, daysUntil, isPast, mergedDetail, type UiEvent } from "../src/adapter.ts";
+import { currentPhase, daysAgo, mergedDetail, type UiEvent } from "../src/adapter.ts";
 import { MockAdapter, TIMELINE } from "../src/adapter.mock.ts";
 
-describe("daysUntil", () => {
-  it("counts whole days forward", () => {
-    expect(daysUntil("2026-12-11", new Date("2026-12-01T23:00:00Z"))).toBe(10);
+describe("daysAgo", () => {
+  it("counts whole days since the shutdown", () => {
+    expect(daysAgo("2026-07-23", new Date("2026-08-29T23:00:00Z"))).toBe(37);
   });
 
-  it("floors at zero once the date has passed", () => {
-    expect(daysUntil("2026-01-01", new Date("2026-12-01T00:00:00Z"))).toBe(0);
-  });
-});
-
-describe("isPast", () => {
-  it("is true on the shutdown day itself, not just after", () => {
-    // The vendor turns it off ON that date; "after" would be a day late.
-    expect(isPast("2026-12-11", "2026-12-11")).toBe(true);
-    expect(isPast("2026-12-11", "2026-12-10")).toBe(false);
+  it("floors at zero rather than counting backwards", () => {
+    // A date that has not arrived is not "-14 days ago".
+    expect(daysAgo("2026-12-11", new Date("2026-08-29T00:00:00Z"))).toBe(0);
   });
 });
 
@@ -77,27 +70,26 @@ describe("the scripted timeline", () => {
 });
 
 describe("MockAdapter", () => {
-  it("fails BEFORE and passes AFTER once the emulated date reaches the shutdown", async () => {
+  it("fails BEFORE and passes AFTER, because the shutdown already happened", async () => {
     const a = new MockAdapter();
     a.reset();
-    await a.setEmulatedDate("2026-12-11");
     for (let i = 0; i < 4; i++) a.advance();
 
     const { before, after } = await a.loadLastRun();
-    expect(before?.status).toBe(400);
+    expect(before?.status).toBe(404);
     expect(before?.tests.failed).toBeGreaterThan(0);
     expect(after?.status).toBe(200);
     expect(after?.tests.failed).toBe(0);
   });
 
-  it("shows the old code working before the shutdown date", async () => {
+  it("has no date to emulate — the old model is gone whenever you look", async () => {
     const a = new MockAdapter();
     a.reset();
     for (let i = 0; i < 4; i++) a.advance();
-    await a.setEmulatedDate("2026-10-01");
 
-    // The point of the slider: drag back and the outage has not happened yet.
-    expect((await a.loadLastRun()).before?.status).toBe(200);
+    // There is no slider to drag back to a working past: gpt-5.1-codex-mini was shut down
+    // on 2026-07-23 and api.openai.com has returned 404 for it ever since.
+    expect((await a.loadLastRun()).before?.status).toBe(404);
   });
 
   it("streams request then response then tests", async () => {

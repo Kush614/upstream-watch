@@ -47,7 +47,6 @@ export interface RunResult {
   status: number;
   responseExcerpt: string;
   tests: { passed: number; failed: number; output: string };
-  emulatedDate: string;
   at: string;
 }
 
@@ -61,22 +60,22 @@ export interface Adapter {
   history(): Promise<UiEvent[]>;
   approve(approvalId: string): Promise<void>;
   reject(approvalId: string, reason: string): Promise<void>;
-  setEmulatedDate(date: string): Promise<void>;
   run(side: "before" | "after"): Promise<AsyncIterable<RunChunk>>;
-  loadLastRun(): Promise<{ before?: RunResult; after?: RunResult; emulatedDate: string }>;
+  loadLastRun(): Promise<{ before?: RunResult; after?: RunResult }>;
 }
 
 /* ────────────────────────── shared helpers ─────────────────────────────── */
 
-/** Whole days from today to `date`, floored at 0. */
-export function daysUntil(date: string, from = new Date()): number {
+/**
+ * Whole days since `date`, floored at 0.
+ *
+ * The shutdown this page proves has already happened, so the honest phrasing is "N days
+ * ago", not a countdown. Nothing here emulates a date any more.
+ */
+export function daysAgo(date: string, from = new Date()): number {
   const target = new Date(`${date}T00:00:00Z`).getTime();
   const start = Date.UTC(from.getUTCFullYear(), from.getUTCMonth(), from.getUTCDate());
-  return Math.max(0, Math.round((target - start) / 86_400_000));
-}
-
-export function isPast(date: string, emulated: string): boolean {
-  return emulated >= date;
+  return Math.max(0, Math.round((start - target) / 86_400_000));
 }
 
 /** The phase a run of events has reached — the UI keys every animation off this. */

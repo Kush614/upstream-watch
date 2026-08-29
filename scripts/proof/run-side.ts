@@ -4,12 +4,11 @@
  */
 
 import { execFile } from "node:child_process";
-import { cp, mkdtemp, rm, symlink } from "node:fs/promises";
+import { cp, mkdtemp, readFile, rm, symlink } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
-import type { VendorStub } from "./vendor-stub.ts";
 
 const run = promisify(execFile);
 
@@ -34,18 +33,23 @@ export interface RunResult {
   status: number;
   responseExcerpt: string;
   tests: { passed: number; failed: number; output: string };
-  emulatedDate: string;
   at: string;
 }
 
 export interface RunOptions {
   root: string;
   side: "before" | "after";
+  oldModel: string;
   newModel: string;
-  stub: VendorStub;
-  stubPort: number;
-  emulatedDate: string;
   emit: (chunk: unknown) => void;
+}
+
+/** What `demo-app/test/proof-receipt.ts` writes down as the call happens. */
+interface Receipt {
+  request: { method: string; url: string; body: unknown };
+  status: number;
+  excerpt: string;
+  at: string;
 }
 
 async function git(args: string[], cwd: string): Promise<string> {
@@ -54,20 +58,38 @@ async function git(args: string[], cwd: string): Promise<string> {
 }
 
 /**
- * The commit that introduced the fix, and its parent.
+ * The commit that carried out the migration, and its parent.
  *
- * Found by searching for the commit that introduced the NEW model string. Taking the last
- * commit that happened to touch the file gives a parent that already contains the fix —
- * "before" and "after" would be the same code, and the proof would show two green columns
- * while appearing to work.
+ * Picking this by heuristic is where the proof quietly dies: choose the commit that merely
+ * last touched the file and the parent already contains the fix, so both columns come back
+ * green and the screen looks like it worked. This repo has now migrated TO `gpt-5.6-terra`
+ * more than once, so "the oldest commit introducing the new model" is wrong too — it finds
+ * a parent pinned to a model that still answers.
+ *
+ * So: take the most recent commit that introduced the new model, then VERIFY the parent is
+ * actually pinned to the retired one. If it is not, this is not the migration we claim to
+ * be proving, and saying so is better than rendering two green columns.
  */
-export async function shas(root: string, newModel: string, file: string): Promise<{ before: string; after: string }> {
-  const found = await git(["log", "-S", newModel, "--format=%H", "--", file], root);
-  const fix = found.split("\n").filter(Boolean).at(-1);
-  if (!fix) throw new ProofError(`No commit introduces ${newModel} in ${file}`, { newModel, file });
+export async function shas(
+  root: string,
+  oldModel: string,
+  newModel: string,
+  file: string,
+): Promise<{ before: string; after: string }> {
+  const found = await git(["log", "-S", `RISK_MODEL = "${newModel}"`, "--format=%H", "--", file], root);
+  const fix = found.split("\n").filter(Boolean).at(0);
+  if (!fix) throw new ProofError(`No commit pins ${file} to ${newModel}`, { newModel, file });
 
   const parent = await git(["rev-parse", `${fix}^`], root);
   if (!parent) throw new ProofError(`Commit ${fix} has no parent to compare against`, { fix });
+
+  const parentSource = await git(["show", `${parent}:${file}`], root);
+  if (!parentSource.includes(`RISK_MODEL = "${oldModel}"`)) {
+    throw new ProofError(
+      `The commit before the fix is not pinned to ${oldModel}, so this is not the migration being proved`,
+      { fix: fix.slice(0, 7), parent: parent.slice(0, 7), oldModel, newModel },
+    );
+  }
 
   return { before: parent.slice(0, 7), after: fix.slice(0, 7) };
 }
@@ -134,12 +156,18 @@ export function countTests(output: string): { passed: number; failed: number } {
 }
 
 export async function runSide(options: RunOptions): Promise<RunResult> {
-  const { root, side, newModel, stub, stubPort, emulatedDate, emit } = options;
+  const { root, side, oldModel, newModel, emit } = options;
   const file = "demo-app/src/risk.ts";
-  const sha = (await shas(root, newModel, file))[side];
+  const sha = (await shas(root, oldModel, newModel, file))[side];
+
+  if (!process.env.OPENAI_API_KEY) {
+    throw new ProofError("No OPENAI_API_KEY — this proof calls the real API and will not pretend otherwise", { side });
+  }
 
   const tree = await worktreeAt(root, sha);
-  stub.reset();
+  // Each side writes its receipt inside its own worktree, so two columns running at once
+  // cannot read each other's call. The two runs are deliberately concurrent.
+  const receiptPath = join(tree.dir, "proof-receipt.json");
 
   let output: string;
   try {
@@ -147,8 +175,8 @@ export async function runSide(options: RunOptions): Promise<RunResult> {
       cwd: tree.dir,
       env: {
         ...process.env,
-        OPENAI_API_BASE: `http://127.0.0.1:${stubPort}`,
-        PROOF_RUN: "1", // switches on the one test that really calls the vendor
+        PROOF_RUN: "1", // switches on the one test that really calls OpenAI
+        PROOF_RECEIPT: receiptPath,
         CI: "true",
       },
       maxBuffer: 20 * 1024 * 1024,
@@ -157,19 +185,24 @@ export async function runSide(options: RunOptions): Promise<RunResult> {
   } catch (error) {
     const e = error as { stdout?: string; stderr?: string };
     output = `${e.stdout ?? ""}\n${e.stderr ?? ""}`;
+  }
+
+  // The exchange the CHECKED-OUT CODE actually had with OpenAI, observed as it happened.
+  // Read before cleanup, because cleanup deletes the worktree it lives in.
+  let receipt: Receipt;
+  try {
+    receipt = JSON.parse(await readFile(receiptPath, "utf8")) as Receipt;
+  } catch (cause) {
+    throw new ProofError(
+      `Commit ${sha} never reached OpenAI, so there is no receipt to show`,
+      { sha, side, cause: String(cause) },
+    );
   } finally {
     await tree.cleanup();
   }
 
-  // The request the CHECKED-OUT CODE actually sent, recorded by the stub as it arrived.
-  // Composing one here would put a receipt on screen that no commit ever produced.
-  const call = stub.calls.at(-1);
-  if (!call) {
-    throw new ProofError(`Commit ${sha} never called the vendor, so there is nothing to show`, { sha, side });
-  }
-
-  emit({ phase: "request", data: call.request });
-  emit({ phase: "response", data: { status: call.status, excerpt: call.excerpt } });
+  emit({ phase: "request", data: receipt.request });
+  emit({ phase: "response", data: { status: receipt.status, excerpt: receipt.excerpt } });
 
   const counts = countTests(output);
   const tests = { ...counts, output: stripAnsi(output).trim().split("\n").slice(-25).join("\n") };
@@ -178,12 +211,11 @@ export async function runSide(options: RunOptions): Promise<RunResult> {
   return {
     side,
     sha,
-    request: call.request,
+    request: receipt.request,
     changedKey: "model",
-    status: call.status,
-    responseExcerpt: call.excerpt,
+    status: receipt.status,
+    responseExcerpt: receipt.excerpt,
     tests,
-    emulatedDate,
     at: new Date().toISOString(),
   };
 }

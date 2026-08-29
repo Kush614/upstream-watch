@@ -1,39 +1,41 @@
 /**
  * The proof runner's HTTP surface.
  *
- * It answers one question honestly: *does your code still work on the day the vendor turns
- * this off?* The vendor emulation lives in ./proof/vendor-stub.ts, the git/vitest execution
- * in ./proof/run-side.ts — this file only wires them to routes and to disk.
+ * It answers one question, and nothing on the screen is emulated: *what happens when this
+ * code calls OpenAI today?* `gpt-5.1-codex-mini` was shut down on 2026-07-23, so the commit
+ * pinned to it gets a real 404 from api.openai.com, and the commit the agent patched gets a
+ * real 200. There is no stub and no emulated date — the deprecation already happened.
+ *
+ * The git/vitest execution lives in ./proof/run-side.ts; this file only wires it to routes
+ * and to disk.
  *
  *   pnpm proof            # serves on :8791
  */
 
-import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { createServer, type ServerResponse } from "node:http";
 import { readFile, writeFile } from "node:fs/promises";
 import { resolve, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { VendorStub } from "./proof/vendor-stub.ts";
 import { ProofError, runSide, type RunResult } from "./proof/run-side.ts";
 import { appendNote } from "../pipeline/src/lib/notes.ts";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const PORT = Number(process.env.PROOF_PORT ?? 8791);
-const STUB_PORT = Number(process.env.PROOF_STUB_PORT ?? 8792);
 
-const SHUTDOWN = "2026-12-11";
-const OLD_MODEL = "gpt-5-mini-2025-08-07";
+/** The migration being proved, exactly as OpenAI's deprecations page records it. */
+const SHUTDOWN = "2026-07-23";
+const OLD_MODEL = "gpt-5.1-codex-mini";
 const NEW_MODEL = "gpt-5.6-terra";
 
 /** Results survive a restart: the UI promises a refresh shows the same screen. */
 const STATE_FILE = join(ROOT, "ui/public/last-run.json");
 
 interface State {
-  emulatedDate: string;
   before?: RunResult;
   after?: RunResult;
 }
 
-let state: State = { emulatedDate: SHUTDOWN };
+let state: State = {};
 
 async function loadState(): Promise<void> {
   try {
@@ -48,23 +50,10 @@ async function saveState(): Promise<void> {
   await writeFile(STATE_FILE, `${JSON.stringify(state, null, 2)}\n`, "utf8").catch(() => undefined);
 }
 
-const stub = new VendorStub({
-  port: STUB_PORT,
-  shutdownDate: SHUTDOWN,
-  retiredModel: OLD_MODEL,
-  emulatedDate: () => state.emulatedDate,
-});
-
 function json(res: ServerResponse, code: number, body: unknown): void {
   res.statusCode = code;
   res.setHeader("content-type", "application/json");
   res.end(JSON.stringify(body));
-}
-
-async function readBody(req: IncomingMessage): Promise<string> {
-  let body = "";
-  for await (const chunk of req) body += chunk;
-  return body;
 }
 
 /** Every top-level failure is written to NOTES.md (CLAUDE.md §7, §2.5). */
@@ -87,17 +76,6 @@ createServer(async (req, res) => {
   if (req.method === "OPTIONS") return json(res, 204, {});
 
   try {
-    if (path === "/date" && req.method === "POST") {
-      const { date } = JSON.parse((await readBody(req)) || "{}") as { date?: string };
-      if (date && date !== state.emulatedDate) {
-        // Results belong to the date they were produced for. Keeping them would show an
-        // outage beside a pre-shutdown slider, or a green column past the shutdown.
-        state = { emulatedDate: date };
-        await saveState();
-      }
-      return json(res, 200, { emulatedDate: state.emulatedDate, cleared: true });
-    }
-
     if (path === "/last") return json(res, 200, state);
 
     if (path === "/run" && req.method === "POST") {
@@ -108,8 +86,7 @@ createServer(async (req, res) => {
       try {
         // Newline-delimited JSON: each phase reaches the column the moment it happens.
         const result = await runSide({
-          root: ROOT, side, newModel: NEW_MODEL, stub, stubPort: STUB_PORT,
-          emulatedDate: state.emulatedDate,
+          root: ROOT, side, oldModel: OLD_MODEL, newModel: NEW_MODEL,
           emit: (chunk) => res.write(`${JSON.stringify(chunk)}\n`),
         });
         state[side] = result;
@@ -128,7 +105,6 @@ createServer(async (req, res) => {
   }
 }).listen(PORT, async () => {
   await loadState();
-  await stub.start();
   console.log(`\n  proof runner on :${PORT}`);
-  console.log(`  emulated vendor on :${STUB_PORT} — behaving as ${SHUTDOWN} onwards\n`);
+  console.log(`  calling the real api.openai.com — ${OLD_MODEL} was shut down ${SHUTDOWN}\n`);
 });

@@ -5,7 +5,6 @@ import { realAdapter } from "./adapter.real.ts";
 import { HEADLINES, fill } from "./copy.ts";
 import { StatusHeader } from "./components/StatusHeader.tsx";
 import { Headline } from "./components/Headline.tsx";
-import { TimeMachine } from "./components/TimeMachine.tsx";
 import { ProofColumn } from "./components/ProofColumn.tsx";
 import { NeedsYou } from "./components/NeedsYou.tsx";
 import { Receipts } from "./components/Receipts.tsx";
@@ -19,7 +18,6 @@ export function App() {
   const [events, setEvents] = useState<UiEvent[]>([]);
   const [before, setBefore] = useState<RunResult | undefined>();
   const [after, setAfter] = useState<RunResult | undefined>();
-  const [emulatedDate, setEmulatedDate] = useState("");
   const [running, setRunning] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -34,7 +32,6 @@ export function App() {
       setEvents(past);
       setBefore(last.before);
       setAfter(last.after);
-      setEmulatedDate(last.emulatedDate);
     })();
 
     return adapter.subscribe((e) => setEvents((prev) => [...prev, e]));
@@ -77,19 +74,6 @@ export function App() {
       // "Running…" for the rest of the session, with nothing said about why.
       setRunning(false);
     }
-  }, []);
-
-  const changeDate = useCallback(async (date: string) => {
-    setEmulatedDate(date);
-    // Results belong to the date they were produced for. Showing an outage beside a
-    // pre-shutdown slider — or a green column past it — is worse than showing nothing.
-    setBefore(undefined);
-    setAfter(undefined);
-
-    await adapter.setEmulatedDate(date);
-    const last = await adapter.loadLastRun();
-    setBefore(last.before);
-    setAfter(last.after);
   }, []);
 
   const decide = useCallback(async (kind: "approve" | "reject", reason?: string) => {
@@ -135,15 +119,22 @@ export function App() {
           dateline={shutdown}
         />
 
-        {shutdown && (
-          <TimeMachine
-            shutdownDate={shutdown}
-            value={emulatedDate || shutdown}
-            onChange={changeDate}
-            onRun={runBoth}
-            running={running}
-          />
-        )}
+        {/* No slider, and nothing to emulate: gpt-5.1-codex-mini really was shut down on
+            2026-07-23, so both columns call the live api.openai.com and report what it says. */}
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-panel px-4 py-3">
+          <p className="text-[13.5px] text-dim">
+            Both columns call the real <span className="text-fg">api.openai.com</span> right now — one
+            commit each, one request each.
+          </p>
+          <button
+            type="button"
+            onClick={runBoth}
+            disabled={running}
+            className="rounded-lg bg-accent px-4 py-2 text-[14px] font-medium text-bg disabled:opacity-50"
+          >
+            {running ? "Running…" : "Run both"}
+          </button>
+        </div>
 
         <div className="grid gap-5 md:grid-cols-2">
           <ProofColumn label="before" result={before} running={running} />

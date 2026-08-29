@@ -166,13 +166,6 @@ class RealAdapter implements Adapter {
     if (this.#sessionId) await decideOnApproval(this.#sessionId, approvalId, "reject", reason);
   }
 
-  async setEmulatedDate(date: string): Promise<void> {
-    await fetch(`${RUNNER}/date`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ date }),
-    });
-  }
 
   /** Streams `request → response → tests` from the proof runner as it happens. */
   async run(side: "before" | "after"): Promise<AsyncIterable<RunChunk>> {
@@ -210,7 +203,7 @@ class RealAdapter implements Adapter {
   async loadLastRun() {
     try {
       const res = await fetch(`${RUNNER}/last`);
-      if (res.ok) return (await res.json()) as { before?: RunResult; after?: RunResult; emulatedDate: string };
+      if (res.ok) return (await res.json()) as { before?: RunResult; after?: RunResult };
     } catch {
       /* runner not started — the receipt it last wrote still stands */
     }
@@ -219,11 +212,11 @@ class RealAdapter implements Adapter {
     // restarted runner, or none at all, still shows the proof that was produced.
     try {
       const res = await fetch("/last-run.json");
-      if (res.ok) return (await res.json()) as { before?: RunResult; after?: RunResult; emulatedDate: string };
+      if (res.ok) return (await res.json()) as { before?: RunResult; after?: RunResult };
     } catch {
       /* nothing has ever been run */
     }
-    return { emulatedDate: new Date().toISOString().slice(0, 10) };
+    return {};
   }
 }
 

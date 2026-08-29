@@ -12,15 +12,15 @@
 import type { Adapter, RunChunk, RunResult, UiEvent } from "./adapter.ts";
 
 const VENDOR = "openai";
-const SHUTDOWN = "2026-12-11";
-const OLD_MODEL = "gpt-5-mini-2025-08-07";
+const SHUTDOWN = "2026-07-23";
+const OLD_MODEL = "gpt-5.1-codex-mini";
 const NEW_MODEL = "gpt-5.6-terra";
 
 const CHANGELOG = {
-  title: "`gpt-5-mini-2025-08-07`",
-  excerpt: "Dec 11, 2026 `gpt-5-mini-2025-08-07` \u2192 `gpt-5.6-terra`",
+  title: "`gpt-5.1-codex-mini`",
+  excerpt: "July 23, 2026 `gpt-5.1-codex-mini` \u2192 `gpt-5.6-terra`",
   url: "https://platform.openai.com/docs/deprecations",
-  sentence: "`" + OLD_MODEL + "` is scheduled for shutdown on " + SHUTDOWN + ".",
+  sentence: "`" + OLD_MODEL + "` was shut down on " + SHUTDOWN + ".",
 };
 
 const DIFF = "diff --git a/demo-app/src/risk.ts b/demo-app/src/risk.ts\nindex 050d969..00525b1 100644\n--- a/demo-app/src/risk.ts\n+++ b/demo-app/src/risk.ts\n@@ -9,7 +9,7 @@\n const OPENAI_API = process.env.OPENAI_API_BASE ?? \"https://api.openai.com/v1\";\n \n /** Pinned deliberately. OpenAI's deprecations page lists a shutdown date for this. */\n-export const RISK_MODEL = \"gpt-5-mini-2025-08-07\";\n+export const RISK_MODEL = \"gpt-5.6-terra\";\n \n export interface RiskRequest {\n   amountCents: number;\ndiff --git a/demo-app/test/vendors.test.ts b/demo-app/test/vendors.test.ts\nindex 330ec35..b3eeb17 100644\n--- a/demo-app/test/vendors.test.ts\n+++ b/demo-app/test/vendors.test.ts\n@@ -6,7 +6,7 @@ describe(\"OpenAI risk check\", () => {\n   it(\"uses the model this service is pinned to\", () => {\n     // Pinned deliberately: OpenAI publishes a shutdown date for this model, so when the\n     // deprecation lands this assertion is what has to change alongside the call.\n-    expect(RISK_MODEL).toBe(\"gpt-5-mini-2025-08-07\");\n+    expect(RISK_MODEL).toBe(\"gpt-5.6-terra\");\n   });\n \n   it(\"builds a prompt carrying the facts a reviewer needs\", () => {\n";
@@ -90,33 +90,31 @@ function requestFor(side: "before" | "after") {
   };
 }
 
-const FAIL_BODY =
-  "The model `" + OLD_MODEL + "` has been shut down.\n" +
-  "Learn more: https://platform.openai.com/docs/deprecations\n" +
-  "Use `" + NEW_MODEL + "` instead.";
+/** Verbatim what api.openai.com returns for this model today. */
+const FAIL_BODY = "404 — Model not found " + OLD_MODEL;
 
-const OK_BODY = '{ "id": "resp_1", "output_text": "low — small amount, familiar country" }';
+const OK_BODY = "200 — low";
 
-function resultFor(side: "before" | "after", emulatedDate: string): RunResult {
-  const broken = side === "before" && emulatedDate >= SHUTDOWN;
+function resultFor(side: "before" | "after"): RunResult {
+  // No date arithmetic left: the shutdown already happened, so "before" is simply broken.
+  const broken = side === "before";
   return {
     side,
     sha: side === "before" ? BEFORE_SHA : AFTER_SHA,
     request: requestFor(side),
     changedKey: "model",
-    status: broken ? 400 : 200,
+    status: broken ? 404 : 200,
     responseExcerpt: broken ? FAIL_BODY : OK_BODY,
     tests: broken
       ? { passed: 9, failed: 3, output: "FAIL demo-app/test/vendors.test.ts\n  x uses the model this service is pinned to\n  x POST /payments returns 201\n  x risk level is parsed\n\n  9 passed | 3 failed" }
       : { passed: 12, failed: 0, output: TEST_OUTPUT || "  12 passed (12)" },
-    emulatedDate,
     at: new Date().toISOString(),
   };
 }
 
 const STORE_KEY = "upstream-watch.mock";
 
-interface MockState { step: number; emulatedDate: string; before?: RunResult; after?: RunResult }
+interface MockState { step: number; before?: RunResult; after?: RunResult }
 
 function load(): MockState {
   try {
@@ -125,7 +123,7 @@ function load(): MockState {
   } catch {
     /* private mode, cleared storage — a fresh start is correct */
   }
-  return { step: 0, emulatedDate: SHUTDOWN };
+  return { step: 0 };
 }
 
 function save(state: MockState): void {
@@ -146,15 +144,15 @@ export class MockAdapter implements Adapter {
 
     // Reaching the tested state fills both columns, as a real run would.
     if (this.#state.step >= 3) {
-      this.#state.before = resultFor("before", this.#state.emulatedDate);
-      this.#state.after = resultFor("after", this.#state.emulatedDate);
+      this.#state.before = resultFor("before");
+      this.#state.after = resultFor("after");
     }
     save(this.#state);
     this.#emit();
   }
 
   reset(): void {
-    this.#state = { step: 0, emulatedDate: SHUTDOWN };
+    this.#state = { step: 0 };
     save(this.#state);
     this.#emit();
   }
@@ -195,16 +193,8 @@ export class MockAdapter implements Adapter {
     this.#emit();
   }
 
-  async setEmulatedDate(date: string): Promise<void> {
-    this.#state.emulatedDate = date;
-    if (this.#state.before) this.#state.before = resultFor("before", date);
-    if (this.#state.after) this.#state.after = resultFor("after", date);
-    save(this.#state);
-    this.#emit();
-  }
-
   async run(side: "before" | "after"): Promise<AsyncIterable<RunChunk>> {
-    const result = resultFor(side, this.#state.emulatedDate);
+    const result = resultFor(side);
     this.#state[side] = result;
     save(this.#state);
 
@@ -222,7 +212,7 @@ export class MockAdapter implements Adapter {
   }
 
   async loadLastRun() {
-    return { before: this.#state.before, after: this.#state.after, emulatedDate: this.#state.emulatedDate };
+    return { before: this.#state.before, after: this.#state.after };
   }
 }
 

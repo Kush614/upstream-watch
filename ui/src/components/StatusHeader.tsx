@@ -1,11 +1,11 @@
-import { daysUntil, type Phase } from "../adapter.ts";
+import { daysAgo, type Phase } from "../adapter.ts";
 
 /**
  * Always visible, top-right. Four states, one line, no jargon — this is the whole story
  * for anyone who reads nothing else on the page.
  */
 export function StatusHeader({ phase, shutdownDate }: { phase: Phase; shutdownDate?: string }) {
-  const days = shutdownDate ? daysUntil(shutdownDate) : 0;
+  const days = shutdownDate ? daysAgo(shutdownDate) : 0;
 
   const { icon, text, tone } = (() => {
     switch (phase) {
@@ -13,7 +13,7 @@ export function StatusHeader({ phase, shutdownDate }: { phase: Phase; shutdownDa
       case "testing":
         return {
           icon: "▲",
-          text: shutdownDate ? `Will break on ${shutdownDate} · in ${days} days` : "Something changed",
+          text: shutdownDate ? `Broke on ${shutdownDate} · ${days} days ago` : "Something changed",
           tone: "text-warn border-warn",
         };
       case "awaiting_approval":
