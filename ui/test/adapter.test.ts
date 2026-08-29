@@ -1,100 +1,120 @@
 import { describe, it, expect } from "vitest";
-import { readPrBody, splitDiff, testResultFrom } from "../src/adapter.ts";
+import { currentPhase, daysUntil, isPast, mergedDetail, type UiEvent } from "../src/adapter.ts";
+import { MockAdapter, TIMELINE } from "../src/adapter.mock.ts";
 
-/** A PR body in the shape agent/prompts/pr-body.md produces. */
-const BODY = `## Upstream change detected — openai
-
-**Changelog entry** (2026-12-11): \`gpt-5-mini-2025-08-07\`
-> Dec 11, 2026 \`gpt-5-mini-2025-08-07\` → \`gpt-5.6-terra\`
-Source: https://platform.openai.com/docs/deprecations
-Provenance: cache
-
-**Why this matters:** Replaced the deprecated risk model with the recommended replacement.
-
-**Files changed:** demo-app/src/risk.ts, demo-app/test/vendors.test.ts
-
-**Tests:**
-\`\`\`
-vitest run: 3 files, 20 tests passed
-\`\`\`
-`;
-
-describe("testResultFrom", () => {
-  it("reads a definite pass", () => {
-    expect(testResultFrom("20 tests passed")).toBe(true);
+describe("daysUntil", () => {
+  it("counts whole days forward", () => {
+    expect(daysUntil("2026-12-11", new Date("2026-12-01T23:00:00Z"))).toBe(10);
   });
 
-  it("reads a definite failure", () => {
-    expect(testResultFrom("2 failed | 18 passed")).toBe(false);
-  });
-
-  it("returns null when nothing says either way", () => {
-    // The dangerous case: this badge sits above the only irreversible button on the page.
-    expect(testResultFrom("running…")).toBeNull();
-    expect(testResultFrom("")).toBeNull();
-  });
-
-  it("never reports a pass merely because output exists", () => {
-    expect(testResultFrom("some unrelated log output")).not.toBe(true);
+  it("floors at zero once the date has passed", () => {
+    expect(daysUntil("2026-01-01", new Date("2026-12-01T00:00:00Z"))).toBe(0);
   });
 });
 
-describe("readPrBody", () => {
-  const parsed = readPrBody(BODY);
-
-  it("recovers vendor, date and source link", () => {
-    expect(parsed.vendor).toBe("openai");
-    expect(parsed.date).toBe("2026-12-11");
-    expect(parsed.url).toBe("https://platform.openai.com/docs/deprecations");
-  });
-
-  it("recovers the quoted excerpt and the rationale", () => {
-    expect(parsed.excerpt).toContain("gpt-5.6-terra");
-    expect(parsed.rationale).toContain("recommended replacement");
-  });
-
-  it("recovers the changed files and the provenance", () => {
-    expect(parsed.files).toContain("demo-app/src/risk.ts");
-    expect(parsed.provenance).toBe("cache");
-  });
-
-  it("degrades to empty rather than throwing on an unrecognised body", () => {
-    const bare = readPrBody("");
-
-    expect(bare.vendor).toBe("unknown");
-    expect(bare.files).toEqual([]);
+describe("isPast", () => {
+  it("is true on the shutdown day itself, not just after", () => {
+    // The vendor turns it off ON that date; "after" would be a day late.
+    expect(isPast("2026-12-11", "2026-12-11")).toBe(true);
+    expect(isPast("2026-12-11", "2026-12-10")).toBe(false);
   });
 });
 
-describe("splitDiff", () => {
-  it("separates removed from added lines", () => {
-    const { before, after } = splitDiff(
-      'diff --git a/x b/x\nindex 1..2\n--- a/x\n+++ b/x\n@@ -1 +1 @@\n-const M = "old";\n+const M = "new";\n',
-    );
+describe("mergedDetail", () => {
+  it("lets later events refine earlier ones without erasing them", () => {
+    const events: UiEvent[] = [
+      { phase: "change_found", message: "", at: "", detail: { vendor: "openai", shutdownDate: "2026-12-11" } },
+      { phase: "awaiting_approval", message: "", at: "", detail: { diff: "x" } },
+    ];
 
-    expect(before.join("")).toContain('"old"');
-    expect(after.join("")).toContain('"new"');
-    expect(before.join("")).not.toContain('"new"');
+    // The approval event carries no vendor; the card still needs one.
+    const d = mergedDetail(events);
+    expect(d.vendor).toBe("openai");
+    expect(d.shutdownDate).toBe("2026-12-11");
+    expect(d.diff).toBe("x");
   });
 
-  it("keeps context lines on both sides", () => {
-    const { before, after } = splitDiff("@@ -1,2 +1,2 @@\n context\n-gone\n+added\n");
+  it("ignores undefined rather than blanking a known value", () => {
+    const events: UiEvent[] = [
+      { phase: "change_found", message: "", at: "", detail: { vendor: "openai" } },
+      { phase: "testing", message: "", at: "", detail: { vendor: undefined } },
+    ];
 
-    expect(before).toContain("context");
-    expect(after).toContain("context");
+    expect(mergedDetail(events).vendor).toBe("openai");
   });
 });
 
-describe("a merge gate opened in a session that did not create the PR", () => {
-  it("takes the PR identity from the gated call's own input", () => {
-    // merge_pull_request carries {owner, repo, pullNumber}. A watch someone returns to days
-    // later will have the merge in one session and the PR creation in another, so the card
-    // has to work from the merge call alone.
-    const input = { owner: "Kush614", repo: "upstream-watch", pullNumber: 6 };
-    const number = Number(input.pullNumber ?? 0);
-    const url = `https://github.com/${input.owner}/${input.repo}/pull/${number}`;
+describe("currentPhase", () => {
+  it("is idle with nothing to report", () => {
+    expect(currentPhase([])).toBe("idle");
+  });
+});
 
-    expect(number).toBe(6);
-    expect(url).toBe("https://github.com/Kush614/upstream-watch/pull/6");
+describe("the scripted timeline", () => {
+  it("tells the whole story in order", () => {
+    expect(TIMELINE.map((e) => e.phase)).toEqual([
+      "idle", "watching", "change_found", "testing",
+      "awaiting_approval", "merged", "repairing", "repaired",
+    ]);
+  });
+
+  it("says nothing technical in the messages the screen shows by default", () => {
+    // No jargon in the default view: the words below belong behind expandable panels.
+    const banned = /\b(API|MCP|sandbox|schema|PR|pull request|subagent)\b/;
+    for (const e of TIMELINE) expect(e.message).not.toMatch(banned);
+  });
+
+  it("carries a real changelog URL, not a placeholder", () => {
+    const found = TIMELINE.find((e) => e.detail?.changelog?.url);
+    expect(found?.detail?.changelog?.url).toContain("platform.openai.com");
+  });
+
+  it("only offers an approval while one is actually pending", () => {
+    for (const e of TIMELINE) {
+      if (e.detail?.approvalId) expect(e.phase).toBe("awaiting_approval");
+    }
+  });
+});
+
+describe("MockAdapter", () => {
+  it("fails BEFORE and passes AFTER once the emulated date reaches the shutdown", async () => {
+    const a = new MockAdapter();
+    a.reset();
+    await a.setEmulatedDate("2026-12-11");
+    for (let i = 0; i < 4; i++) a.advance();
+
+    const { before, after } = await a.loadLastRun();
+    expect(before?.status).toBe(400);
+    expect(before?.tests.failed).toBeGreaterThan(0);
+    expect(after?.status).toBe(200);
+    expect(after?.tests.failed).toBe(0);
+  });
+
+  it("shows the old code working before the shutdown date", async () => {
+    const a = new MockAdapter();
+    a.reset();
+    for (let i = 0; i < 4; i++) a.advance();
+    await a.setEmulatedDate("2026-10-01");
+
+    // The point of the slider: drag back and the outage has not happened yet.
+    expect((await a.loadLastRun()).before?.status).toBe(200);
+  });
+
+  it("streams request then response then tests", async () => {
+    const a = new MockAdapter();
+    const phases: string[] = [];
+    for await (const chunk of await a.run("after")) phases.push(chunk.phase);
+
+    expect(phases).toEqual(["request", "response", "tests"]);
+  });
+
+  it("jumps to merged on approve", async () => {
+    const a = new MockAdapter();
+    a.reset();
+    let phase = "";
+    a.subscribe((e) => { phase = e.phase; });
+    await a.approve("mock-approval-1");
+
+    expect(phase).toBe("merged");
   });
 });
