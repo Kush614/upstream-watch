@@ -1,92 +1,86 @@
 import { describe, it, expect } from "vitest";
-import { fencedBlock, filesFrom, parseEvidence, testResultFrom } from "../src/adapter.ts";
+import { readPrBody, splitDiff, testResultFrom } from "../src/adapter.ts";
 
-/**
- * A PR body in the shape agent/prompts/pr-body.md produces. The approval card recovers its
- * evidence from this, because `merge_pull_request` carries none of it.
- */
-const BODY = `## Upstream change detected — stripe
+/** A PR body in the shape agent/prompts/pr-body.md produces. */
+const BODY = `## Upstream change detected — openai
 
-**Changelog entry** (2026-08-26): Removes support for specifying payment method types
-> **Removes support for specifying payment method types in Payment Intents**
->
-> Removes \`payment_method_types\` as a writable parameter. Affected: PaymentIntent#create
-Source: https://docs.stripe.com/changelog/dahlia#removes-payment-method-types
+**Changelog entry** (2026-12-11): \`gpt-5-mini-2025-08-07\`
+> Dec 11, 2026 \`gpt-5-mini-2025-08-07\` → \`gpt-5.6-terra\`
+Source: https://platform.openai.com/docs/deprecations
+Provenance: cache
 
-**Why this matters:** Charges API migration.
+**Why this matters:** Replaced the deprecated risk model with the recommended replacement.
 
-**Files changed:** \`demo-app/src/payments.ts\`
+**Files changed:** demo-app/src/risk.ts, demo-app/test/vendors.test.ts
 
 **Tests:**
 \`\`\`
-Test Files 1 passed (1)
-     Tests 14 passed (14)
+vitest run: 3 files, 20 tests passed
 \`\`\`
-
----
-
-Scraped live via Bright Data · vendor-flagged breaking · symbols: \`PaymentIntent#create\`
 `;
 
 describe("testResultFrom", () => {
   it("reads a definite pass", () => {
-    expect(testResultFrom(BODY)).toBe(true);
+    expect(testResultFrom("20 tests passed")).toBe(true);
   });
 
   it("reads a definite failure", () => {
-    expect(testResultFrom("⚠️ **Tests did not pass** after 3 iterations")).toBe(false);
+    expect(testResultFrom("2 failed | 18 passed")).toBe(false);
   });
 
   it("returns null when nothing says either way", () => {
-    // The dangerous case. Defaulting to true would tell a human tests passed when the PR
-    // body never said so — and they are about to merge on the strength of that badge.
-    expect(testResultFrom("## Upstream change detected — stripe")).toBeNull();
+    // The dangerous case: this badge sits above the only irreversible button on the page.
+    expect(testResultFrom("running…")).toBeNull();
+    expect(testResultFrom("")).toBeNull();
   });
 
-  it("never reports a pass from an empty body", () => {
-    expect(testResultFrom("")).not.toBe(true);
+  it("never reports a pass merely because output exists", () => {
+    expect(testResultFrom("some unrelated log output")).not.toBe(true);
   });
 });
 
-describe("parseEvidence", () => {
-  const entry = parseEvidence(BODY, "fallback");
+describe("readPrBody", () => {
+  const parsed = readPrBody(BODY);
 
-  it("recovers the vendor, date and source link", () => {
-    expect(entry.vendor).toBe("stripe");
-    expect(entry.date).toBe("2026-08-26");
-    expect(entry.url).toContain("docs.stripe.com/changelog");
+  it("recovers vendor, date and source link", () => {
+    expect(parsed.vendor).toBe("openai");
+    expect(parsed.date).toBe("2026-12-11");
+    expect(parsed.url).toBe("https://platform.openai.com/docs/deprecations");
   });
 
-  it("recovers the changelog title and quoted excerpt", () => {
-    expect(entry.title).toContain("payment method types");
-    expect(entry.body).toContain("payment_method_types");
+  it("recovers the quoted excerpt and the rationale", () => {
+    expect(parsed.excerpt).toContain("gpt-5.6-terra");
+    expect(parsed.rationale).toContain("recommended replacement");
   });
 
-  it("recovers the breaking flag and matched symbols", () => {
-    expect(entry.breaking).toBe(true);
-    expect(entry.symbols).toContain("PaymentIntent#create");
+  it("recovers the changed files and the provenance", () => {
+    expect(parsed.files).toContain("demo-app/src/risk.ts");
+    expect(parsed.provenance).toBe("cache");
   });
 
-  it("falls back to the tool name when the body has no evidence", () => {
-    const bare = parseEvidence("", "merge_pull_request");
+  it("degrades to empty rather than throwing on an unrecognised body", () => {
+    const bare = readPrBody("");
 
-    expect(bare.title).toBe("merge_pull_request");
     expect(bare.vendor).toBe("unknown");
-    expect(bare.breaking).toBe(false);
+    expect(bare.files).toEqual([]);
   });
 });
 
-describe("filesFrom / fencedBlock", () => {
-  it("recovers the files the patch touched", () => {
-    expect(filesFrom(BODY)).toEqual(["demo-app/src/payments.ts"]);
+describe("splitDiff", () => {
+  it("separates removed from added lines", () => {
+    const { before, after } = splitDiff(
+      'diff --git a/x b/x\nindex 1..2\n--- a/x\n+++ b/x\n@@ -1 +1 @@\n-const M = "old";\n+const M = "new";\n',
+    );
+
+    expect(before.join("")).toContain('"old"');
+    expect(after.join("")).toContain('"new"');
+    expect(before.join("")).not.toContain('"new"');
   });
 
-  it("recovers the test output block", () => {
-    expect(fencedBlock(BODY, "")).toContain("14 passed");
-  });
+  it("keeps context lines on both sides", () => {
+    const { before, after } = splitDiff("@@ -1,2 +1,2 @@\n context\n-gone\n+added\n");
 
-  it("returns empty rather than throwing when a block is absent", () => {
-    expect(fencedBlock("no blocks here", "diff")).toBe("");
-    expect(filesFrom("")).toEqual([]);
+    expect(before).toContain("context");
+    expect(after).toContain("context");
   });
 });
