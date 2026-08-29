@@ -2,13 +2,39 @@ import { parse as parseHtml, type HTMLElement } from "node-html-parser";
 import { ConfigError } from "../errors.ts";
 import type { ChangelogEntry, EmbeddedJsonSpec, ExtractionSpec, FieldSpec } from "../types.ts";
 
-const ISO_DATE = /\b(\d{4}-\d{2}-\d{2})\b/;
+// No trailing \b: in "2026-08-20T00:00:00Z" the next character is a word character, so a
+// boundary does not exist there and the match would fail. A negative lookahead for a digit
+// gets the same protection without that trap.
+const ISO_DATE = /(?<!\d)(\d{4}-\d{2}-\d{2})(?!\d)/;
 
 /* ────────────────────────────── shared helpers ────────────────────────────── */
 
-/** Pull a date out of a value, tolerating "2026-08-26.dahlia" or "Posted 2026-08-26". */
-function normaliseDate(value: string): string {
-  return ISO_DATE.exec(value)?.[1] ?? "";
+const MONTHS: Record<string, string> = {
+  jan: "01", feb: "02", mar: "03", apr: "04", may: "05", jun: "06",
+  jul: "07", aug: "08", sep: "09", oct: "10", nov: "11", dec: "12",
+};
+
+/** e.g. "Jan 20, 2027" — the shape most vendors print for humans. */
+const TEXT_DATE = /\b([A-Z][a-z]{2})[a-z]*\.?\s+(\d{1,2}),?\s+(\d{4})\b/;
+
+/**
+ * Normalise a date to YYYY-MM-DD.
+ *
+ * Handles "2026-08-26.dahlia", "Posted 2026-08-26", and human formats like "Jan 20, 2027" —
+ * OpenAI's deprecation tables use the last of those, and the schema requires ISO.
+ */
+function normaliseDate(raw: string): string {
+  // Vendors print non-breaking and en-dash hyphens in dates; OpenAI's tables use U+2011.
+  const value = raw.replace(/[\u2010-\u2015\u2212]/g, "-");
+
+  const iso = ISO_DATE.exec(value)?.[1];
+  if (iso) return iso;
+
+  const text = TEXT_DATE.exec(value);
+  if (!text) return "";
+
+  const month = MONTHS[(text[1] ?? "").toLowerCase()];
+  return month ? `${text[3]}-${month}-${(text[2] ?? "").padStart(2, "0")}` : "";
 }
 
 function collapse(text: string): string {
@@ -32,7 +58,7 @@ function resolveUrl(href: string, baseUrl: string): string {
 
 /* ──────────────────────────── strategy: css ──────────────────────────────── */
 
-function fieldParts(spec: FieldSpec | undefined): { selector?: string; attr?: string } {
+function fieldParts(spec: FieldSpec | undefined): { selector?: string; attr?: string; value?: string } {
   if (!spec) return {};
   return typeof spec === "string" ? { selector: spec } : spec;
 }
@@ -51,7 +77,9 @@ function textWithCodeSpans(el: HTMLElement): string {
 
 /** Read one field. Returns "" rather than throwing — a missing field is a schema problem. */
 function readField(entry: HTMLElement, spec: FieldSpec | undefined): string {
-  const { selector, attr } = fieldParts(spec);
+  const { selector, attr, value } = fieldParts(spec);
+  if (value !== undefined) return value;
+
   const el = selector ? entry.querySelector(selector) : entry;
   if (!el) return "";
   return (attr ? (el.getAttribute(attr) ?? "") : textWithCodeSpans(el)).trim();
@@ -66,7 +94,9 @@ function extractCss(html: string, spec: ExtractionSpec): ChangelogEntry[] {
     title: readField(el, spec.fields?.title),
     body: readField(el, spec.fields?.body),
     url: resolveUrl(readField(el, spec.fields?.url), spec.url),
-    breaking: false, // decided by classify(), not by parsing
+    // Normally classify() decides. A source flagged breaking_default is one where the page
+    // itself is the claim, so the entry carries it and classify reads it as vendor-flagged.
+    breaking: spec.breaking_default === true,
   }));
 }
 

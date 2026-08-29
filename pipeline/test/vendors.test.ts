@@ -80,10 +80,10 @@ describe("per-vendor source", () => {
 });
 
 describe("both vendors are configured", () => {
-  it("watches stripe and cloudflare, each mapped to real files", async () => {
+  it("watches four vendors, each mapped to real files", async () => {
     const { vendors } = await loadTargets();
 
-    expect(vendors.map((v) => v.vendor).sort()).toEqual(["cloudflare", "stripe"]);
+    expect(vendors.map((v) => v.vendor).sort()).toEqual(["cloudflare", "openai", "slack", "stripe"]);
     for (const v of vendors) {
       expect(v.files.length).toBeGreaterThan(0);
       expect(v.symbols.length).toBeGreaterThan(0);

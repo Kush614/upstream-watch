@@ -264,3 +264,36 @@ of each.
 The approval gate is not a formality bolted on for the judging criteria. The agent genuinely
 wanted to merge, had a green test suite and a defensible diff, and was stopped anyway. That is
 the whole product in one event.
+
+## 2026-08-30 — Two more vendors, and a date regex that had been lucky
+
+**Where:** `pipeline/src/lib/parse.ts`, `skills/…/SKILL.md`, `agent/targets.yaml`
+**Symptom:** Adding OpenAI and Slack, both extracted but neither validated. OpenAI: 145 of 150
+rows valid. Slack: **0 of 221** — every entry had an empty date, despite `datePublished`
+being right there in the JSON.
+**Cause:** Two, and the second had been hiding since the first day.
+
+OpenAI's tables print `2026‑03‑26` with U+2011, a non-breaking hyphen, which is not `-`.
+
+The real one: `ISO_DATE` was `/\b(\d{4}-\d{2}-\d{2})\b/`. Slack's `datePublished` is
+`2026-08-20T00:00:00.000Z` — the character after the date is `T`, and `0` and `T` are *both*
+word characters, so no word boundary exists there and the match fails. It had worked for
+Stripe purely because `2026-08-26.dahlia` happens to have a `.` in that position, and for
+Cloudflare because `datetime="2026-08-30"` has a quote. The regex was never right; it had been
+lucky twice.
+
+**Fix:** `(?<!\d)(\d{4}-\d{2}-\d{2})(?!\d)` — same protection, no boundary trap — plus
+normalising Unicode dashes, plus a text-date parser for `Jan 20, 2027`. Also added
+`breaking_default` to the extraction spec: OpenAI's rows are `<date> <deprecated>
+<replacement>` and never contain the word "deprecated", so keyword hints cannot see what the
+page as a whole obviously is.
+
+**Lesson:** A regex that passes on every input you have tried is not the same as a correct one,
+and `\b` on the end of a numeric pattern is a trap whenever the next character might be a
+letter. It took a third data source to expose it. The tests now pin the exact case
+(`"...T00:00:00.000Z"`), which is the only reason it stays fixed.
+
+**And the better demo:** OpenAI's deprecations page states the replacement — `gpt-5-mini-2025-08-07
+→ gpt-5.6-terra`. Stripe says "this is deprecated" and leaves you to work out the migration;
+OpenAI hands you the target, so the patch is checkable rather than inferred. The model
+`demo-app/src/risk.ts` is pinned to shuts down 2026-12-11.

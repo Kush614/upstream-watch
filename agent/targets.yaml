@@ -26,6 +26,19 @@ vendors:
     symbols: [purge_cache, /client/v4/zones, Cache Rules, cache reserve]
     files: [demo-app/src/cdn.ts]
 
+  openai:
+    url: https://platform.openai.com/docs/deprecations
+    schema: schemas/changelog-entry.json
+    # The model demo-app/src/risk.ts is pinned to, plus API surfaces it could grow into.
+    symbols: [gpt-5-mini-2025-08-07, gpt-5-mini, v1/prompts, chat/completions]
+    files: [demo-app/src/risk.ts]
+
+  slack:
+    url: https://docs.slack.dev/changelog
+    schema: schemas/changelog-entry.json
+    symbols: [chat.postMessage, conversations., Workflow Steps]
+    files: [demo-app/src/notify.ts]
+
   # Note on provenance: Bright Data's compliance policy blocks docs.stripe.com
   # (policy_20050 — the domain needs KYC), so Stripe is watched from a committed real
   # capture while Cloudflare is scraped live. `pnpm check` prints which is which, and so

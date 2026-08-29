@@ -78,11 +78,24 @@ export interface ExtractionSpec {
   entry_selector?: string;
   fields?: { date?: FieldSpec; title?: FieldSpec; body?: FieldSpec; url?: FieldSpec };
   json?: EmbeddedJsonSpec;
+  /**
+   * True when every entry from this source is a breaking change by construction — a
+   * deprecations page, say. OpenAI's table rows are literally "<date> <deprecated thing>
+   * <replacement>" and never contain the word "deprecated", so keyword hints cannot see
+   * what the page as a whole obviously is.
+   */
+  breaking_default?: boolean;
   breaking_hint: string[];
 }
 
-/** A field selector. A bare string is shorthand for `{ selector }`. */
-export type FieldSpec = string | { selector?: string; attr?: string };
+/**
+ * A field selector. A bare string is shorthand for `{ selector }`.
+ *
+ * `value` supplies a literal instead of reading the DOM — needed for sources like
+ * OpenAI's deprecation tables, whose rows carry no permalink of their own. A relative
+ * value is resolved against the vendor's page URL.
+ */
+export type FieldSpec = string | { selector?: string; attr?: string; value?: string };
 
 /**
  * For pages that server-render their changelog as embedded JSON rather than as markup.

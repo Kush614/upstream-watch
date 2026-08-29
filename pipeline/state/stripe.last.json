@@ -1,6 +1,6 @@
 {
   "vendor": "stripe",
-  "lastCheck": "2026-08-29T21:21:22.020Z",
+  "lastCheck": "2026-08-29T21:44:27.551Z",
   "seen": [
     "2026-02-25::Adds display name and service user number to Bacs Direct Debit mandates",
     "2026-02-25::Adds settlement type to Application Fee objects",

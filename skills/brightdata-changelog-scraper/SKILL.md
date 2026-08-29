@@ -68,6 +68,39 @@ vendors:
       body:  ".docs-content"
       url:   { selector: "a.nb-cl-title-link", attr: "href" }
     breaking_hint: ["deprecat", "removed", "breaking", "no longer", "end of life", "sunset"]
+
+  openai:
+    # The deprecations page, not the changelog: it is a table of
+    # "<shutdown date> | <deprecated thing> | <recommended replacement>", so the vendor
+    # states the migration target instead of leaving us to infer it.
+    url: https://platform.openai.com/docs/deprecations
+    strategy: css
+    entry_selector: "table tbody tr"
+    fields:
+      date:  "td:nth-child(1)"        # "Jan 20, 2027" -> normalised to ISO
+      title: "td:nth-child(2)"        # the deprecated model or API
+      body:  ""                       # whole row: date, deprecated, replacement
+      # Rows carry no permalink, so the field is a literal resolved against `url`.
+      url:   { value: "https://platform.openai.com/docs/deprecations" }
+    # Every row on this page is a scheduled removal, and the rows themselves never say so.
+    breaking_default: true
+    breaking_hint: ["deprecat", "shut down", "no longer", "removed", "read-only"]
+
+  slack:
+    url: https://docs.slack.dev/changelog
+    # Slack ships schema.org JSON-LD: a Blog with a blogPost[] array, each entry already
+    # carrying datePublished, headline, description and url.
+    strategy: embedded-json
+    json:
+      marker: "type=application/ld+json>"
+      entries_path: "blogPost[]"
+      map:
+        date: "datePublished"
+        title: "headline"
+        body: ["description"]
+        url: "url"
+        breaking: "notPublished"      # Slack publishes no flag; breaking_hint decides
+    breaking_hint: ["deprecat", "removed", "breaking", "no longer", "sunset", "retire"]
 ```
 
 ### Why `strategy` exists
