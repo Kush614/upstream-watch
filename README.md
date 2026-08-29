@@ -69,6 +69,7 @@ Requires **Node 22+** and `pnpm`.
 cp .env.example .env            # fill keys
 pnpm install
 npx @truefoundry/trueforge      # terminal 1 — harness on :8790
+./scripts/setup-harness.sh      # configures the harness from .env, idempotently
 pnpm --filter pipeline dev      # terminal 2 — scraper runner
 pnpm --filter ui dev            # terminal 3 — custom UI on :5173
 pnpm demo:seed                  # loads fixtures + seeded breaking change

@@ -71,6 +71,7 @@ upstream-watch/
 cp .env.example .env            # fill keys
 pnpm install
 npx @truefoundry/trueforge       # terminal 1 — harness on :8790
+./scripts/setup-harness.sh       # configure it: model, connector, skill, sandbox, agent
 pnpm --filter pipeline dev       # terminal 2 — scraper runner
 pnpm --filter ui dev             # terminal 3 — custom UI on :5173
 pnpm demo:seed                   # loads fixtures + seeded breaking change
@@ -96,6 +97,11 @@ pnpm demo:break-page                # swap in the restructured page; demo:restor
 
 **Live is the default.** `DEMO_MODE=1` opts *out*, replaying the cached `current.html` —
 the fallback in `docs/PLAN.md`, not the normal path.
+
+`scripts/setup-harness.sh` is the TrueForge quickstart's seven browser steps done over its
+REST API, reading keys from `.env`. It is idempotent — re-run it after adding a missing key
+and it configures only what is absent. The GitHub connector is header-PAT auth, so it wires
+itself from `gh auth token`; no OAuth round-trip is involved.
 
 ## 6. Bright Data scraper settings (rules for the coding assistant)
 
