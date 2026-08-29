@@ -356,3 +356,43 @@ irreversibility.
 There is an irony worth keeping: this project exists to stop an agent from doing something
 irreversible without asking. I did the irreversible thing to myself, by hand, with a convenience
 flag I did not think about.
+
+## 2026-08-30 — A 200 that meant "no"
+
+**Where:** `ui/vite.config.ts`, the dev proxy to TrueForge
+**Symptom:** Approving the pending merge gate through the UI's own transport failed, and the
+failure looked like success. Every `/api/...` request through `localhost:5173` returned
+**HTTP 200** — with `<!doctype html>` and the app's own shell as the body.
+**Cause:** `npx @truefoundry/trueforge` binds `[::1]:8790`. The proxy target defaulted to
+`http://localhost:8790`, which resolves to `127.0.0.1` here, where nothing listens. Vite fell
+through to its SPA handler and answered every API call with `index.html`. From the browser it
+is indistinguishable from a healthy server returning unexpected JSON: 200 on every request,
+nothing in the log, and the app quietly reporting "local feed" forever.
+**Fix:** Default the target to `http://[::1]:8790`, and register a proxy `error` handler that
+logs `[proxy] TrueForge unreachable: …` rather than letting a dead upstream fall through
+silently.
+**Lesson:** Second time this shape has cost me time today — Bright Data's `format: "raw"`
+returning 200-and-empty for a blocked domain, and now a dev proxy returning 200-and-HTML for a
+dead upstream. **An opaque success is the most expensive failure mode there is**, because every
+check you would normally run says the system is fine. Both fixes were the same: make the
+component capable of saying no.
+
+Worth noting how it was found: not by testing the proxy, but by trying to approve a real
+merge through it. The UI had passed its unit tests all along.
+
+## 2026-08-30 — Moving a prompt into a file makes the file a dependency
+
+**Where:** `demo-app/src/risk.ts`, `agent/prompts/risk-summary.md`
+**Symptom:** None yet — caught in review before it could happen.
+**Cause:** Moving the fraud-risk instructions out of TypeScript and into
+`agent/prompts/risk-summary.md` satisfies `CLAUDE.md` §7, but it turns a string that could
+never fail into a file read that can. A missing or unbundled Markdown file would surface as a
+bare `ENOENT` thrown from inside a payment request — a confusing place to discover that a docs
+file was not deployed. The same applies if the file exists but has nothing below its `---`
+separator: the model would receive an empty prompt and answer anyway.
+**Fix:** `promptTemplate()` catches both and throws with the path and the reason, naming
+`CLAUDE.md` §7 so the next person knows the file is load-bearing rather than documentation.
+**Lesson:** "Move it into a config file" is not free. Every string promoted to a file becomes a
+deployment artifact, and every artifact can be absent. The rule that prompts live in `.md`
+files is a good one; it just quietly adds a failure path each time it is applied, and those are
+worth handling where they occur rather than at the top of a request.

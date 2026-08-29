@@ -33,3 +33,23 @@ describe("Slack notification", () => {
     expect(postMessage).toHaveBeenCalledWith({ channel: "#ops", text: "Payment pi_2 succeeded: 1.00 EUR" });
   });
 });
+
+describe("the risk prompt lives in a file", () => {
+  it("interpolates the payment into the template from agent/prompts/", () => {
+    // CLAUDE.md §7: prompts are .md files, never inline strings — so the wording can be
+    // reviewed and changed without touching code.
+    const prompt = buildRiskPrompt({ amountCents: 4200, currency: "usd", country: "GB", cardLast4: "4242" });
+
+    expect(prompt).toContain("42.00 USD");
+    expect(prompt).toContain("Country: GB");
+    expect(prompt).toContain("Card ending: 4242");
+    expect(prompt).not.toContain("{{");
+  });
+
+  it("does not leak the human-facing guidance above the separator", () => {
+    const prompt = buildRiskPrompt({ amountCents: 100, currency: "eur", country: "IE", cardLast4: "1111" });
+
+    expect(prompt).not.toContain("CLAUDE.md");
+    expect(prompt).not.toContain("placeholders");
+  });
+});
