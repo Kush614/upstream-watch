@@ -38,7 +38,12 @@ signals that fired, and they are printed in the PR body so a human can check the
 **A scrape that returns 0 entries or fails schema validation is a change event, not an error**
 (`CLAUDE.md` §6). Vendors redesign their changelog pages; that is signal.
 
-1. Detect: 0 entries, or a schema failure.
+**Partial failures count too.** If some entries validate and some do not, the run continues on
+the ones it can read *and* emits an `extraction-broken` event with `partial: true`. Carrying on
+quietly would drop the invalid entries — and a newly added breaking entry is exactly the kind
+that is malformed first, so it could stay invisible indefinitely.
+
+1. Detect: 0 entries, a schema failure, or any invalid entry alongside valid ones.
 2. Re-run the extraction against the **cached** HTML — cheap, offline, repeatable.
 3. Propose a new extraction spec.
 4. Validate the proposal against the cached HTML.

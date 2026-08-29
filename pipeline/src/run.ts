@@ -49,7 +49,9 @@ async function runTarget(
   const scrape = await client.scrape(target);
   const spec = await loadExtractionSpec(target.extractionSpec);
 
-  const extracted = extractEntries(scrape.html, spec).map(withClassification);
+  // Entry permalinks are resolved against the page they came from, so relative hrefs
+  // survive schema validation.
+  const extracted = extractEntries(scrape.html, spec, target.url).map(withClassification);
   const { valid, invalid } = validateEntries(extracted);
 
   const base: VendorReport = {
@@ -87,6 +89,7 @@ async function runTarget(
             vendor: target.vendor,
             reason,
             cachedHtmlPath: scrape.cachedHtmlPath,
+            partial: false,
             ...(repair ? { repairedSpec: repair.spec } : {}),
           },
         ],
@@ -94,15 +97,39 @@ async function runTarget(
     };
   }
 
+  const events: ChangeEvent[] = [];
+
+  // Some entries validated and some did not. Continuing on the valid ones alone would
+  // silently drop the invalid ones - and a newly added breaking entry is exactly the kind
+  // of thing that is malformed first, so it could stay invisible forever. Surface it, then
+  // carry on with what we can read.
+  if (invalid.length > 0) {
+    const better = proposeExtractionSpec(scrape.html, spec) ?? undefined;
+    const repair = better && better.validEntries > valid.length ? better : undefined;
+
+    events.push({
+      kind: "extraction-broken",
+      vendor: target.vendor,
+      reason:
+        `${invalid.length} of ${extracted.length} entries failed schema validation ` +
+        `(continuing on the ${valid.length} that passed): ${invalid[0]?.errors ?? ""}`,
+      cachedHtmlPath: scrape.cachedHtmlPath,
+      partial: true,
+      ...(repair ? { repairedSpec: repair.spec } : {}),
+    });
+  }
+
   const { added, firstRun } = diffEntries(valid, state, target.vendor);
 
   // On a first run everything looks new. Baseline silently rather than reporting the
   // vendor's whole backlog as breaking news (specs/agent.md §The loop, step 2).
   if (firstRun) {
-    return { entries: valid, report: { ...base, added: added.length, firstRun: true } };
+    return {
+      entries: valid,
+      report: { ...base, added: added.length, firstRun: true, events },
+    };
   }
 
-  const events: ChangeEvent[] = [];
   const ignoredBreaking: ChangelogEntry[] = [];
 
   for (const entry of added) {
@@ -145,11 +172,13 @@ export async function run(options: RunOptions = {}): Promise<RunReport> {
 
     if (entries.length > 0) {
       state = markSeen(state, target.vendor, entries);
-    }
-  }
 
-  if (options.persist !== false) {
-    await saveState(state, options.stateFile);
+      // Persist per target rather than once at the end: if a later target throws, the
+      // work already done stays recorded instead of being replayed as new next run.
+      if (options.persist !== false) {
+        await saveState(state, options.stateFile);
+      }
+    }
   }
 
   return { vendors, events: vendors.flatMap((v) => v.events) };

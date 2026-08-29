@@ -3,6 +3,8 @@ import { ConfigError } from "../errors.ts";
 import { fromRepoRoot } from "./paths.ts";
 import type { ExtractionSpec } from "../types.ts";
 
+const REQUIRED_FIELDS = ["date", "title", "body", "url"] as const;
+
 export async function loadExtractionSpec(file: string): Promise<ExtractionSpec> {
   let spec: ExtractionSpec;
   try {
@@ -11,8 +13,22 @@ export async function loadExtractionSpec(file: string): Promise<ExtractionSpec> 
     throw new ConfigError(`Could not read extraction spec ${file}`, { cause: String(cause) });
   }
 
-  if (!spec.entry || !spec.fields?.date || !spec.fields?.title) {
-    throw new ConfigError(`Extraction spec ${file} is missing required fields`, { spec });
+  if (typeof spec.entry !== "string" || spec.entry.length === 0) {
+    throw new ConfigError(`Extraction spec ${file} has no entry selector`, { spec });
+  }
+
+  // parse.ts reads all four fields unconditionally, so a spec missing any one of them
+  // would throw a TypeError deep in extraction rather than a ConfigError here.
+  const missing = REQUIRED_FIELDS.filter((field) => {
+    const value = spec.fields?.[field];
+    return typeof value !== "object" || value === null;
+  });
+
+  if (missing.length > 0) {
+    throw new ConfigError(
+      `Extraction spec ${file} is missing field spec(s): ${missing.join(", ")}`,
+      { spec },
+    );
   }
   return spec;
 }

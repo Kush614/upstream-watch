@@ -57,6 +57,20 @@ describe("run", () => {
     expect(event.matches.map((m) => m.symbol)).toContain("source");
   });
 
+  it("shows the breaking-but-not-ours entry alongside it, without acting on it", async () => {
+    const stateFile = freshState();
+
+    await run({ client: new FixtureScraperClient("baseline"), stateFile });
+    const report = await run({ client: new FixtureScraperClient("breaking"), stateFile });
+
+    // Both seeded entries are new. docs/DEMO.md narrates this pair, so if it ever stops
+    // rendering, the demo script is making a claim the output does not support.
+    expect(report.vendors[0]?.added).toBe(2);
+    expect(report.vendors[0]?.ignoredBreaking.map((e) => e.title)).toEqual([
+      "The `radar_rules` beta endpoint is removed",
+    ]);
+  });
+
   it("records a breaking change that touches nothing we call, without acting on it", async () => {
     const stateFile = freshState();
     await seedState(stateFile, emptyButNotFirstRun("stripe"));

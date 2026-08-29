@@ -58,6 +58,11 @@ export type ChangeEvent =
       vendor: string;
       reason: string;
       cachedHtmlPath: string;
+      /**
+       * True when SOME entries still validated. The run continues on those, but the
+       * page has drifted and the entries that failed are invisible until it is fixed.
+       */
+      partial: boolean;
       /** Present when self-repair found a working spec. */
       repairedSpec?: ExtractionSpec;
     };

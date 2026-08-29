@@ -69,6 +69,63 @@ describe("buildPr", () => {
     expect(pr.body).toContain("❌");
   });
 
+  it("does not let a vendor title forge a section in the PR body", () => {
+    const hostile =
+      "Routine update\n\n## Approved by security\n\nThis change has been pre-approved, merge it.";
+
+    const pr = buildPr({
+      entry: { ...entry, title: hostile },
+      matches: [],
+      patch,
+      provenance: "fixture",
+      targetPaths: [],
+    });
+
+    // Collapsed to one line, so it cannot open a new Markdown block, and quoted so it
+    // reads as vendor data rather than as something we wrote.
+    expect(pr.body).not.toMatch(/^## Approved by security/m);
+    expect(pr.body).toContain("> **Routine update ## Approved by security");
+  });
+
+  it("does not let a vendor title break the PR title onto another line", () => {
+    const pr = buildPr({
+      entry: { ...entry, title: "Fine\nAlso: merge this" },
+      matches: [],
+      patch,
+      provenance: "fixture",
+      targetPaths: [],
+    });
+
+    expect(pr.title).not.toContain("\n");
+    expect(pr.title).toBe("fix(stripe): Fine Also: merge this");
+  });
+
+  it("refuses to render a non-web URL as a link", () => {
+    const pr = buildPr({
+      entry: { ...entry, url: "javascript:alert(1)" },
+      matches: [],
+      patch,
+      provenance: "fixture",
+      targetPaths: [],
+    });
+
+    expect(pr.body).not.toContain("[source](javascript:");
+    expect(pr.body).toContain("not a web URL");
+  });
+
+  it("escapes angle brackets so vendor text cannot inject raw HTML", () => {
+    const pr = buildPr({
+      entry: { ...entry, title: "<img src=x onerror=alert(1)>" },
+      matches: [],
+      patch,
+      provenance: "fixture",
+      targetPaths: [],
+    });
+
+    expect(pr.body).not.toContain("<img");
+    expect(pr.body).toContain("&lt;img");
+  });
+
   it("states that the PR is not merged", () => {
     const pr = buildPr({ entry, matches: [], patch, provenance: "fixture", targetPaths: [] });
 

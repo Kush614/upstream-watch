@@ -55,10 +55,20 @@ export async function loadTargets(file = TARGETS_FILE): Promise<WatchTarget[]> {
         restructured: str(t.fixtures?.restructured, "fixtures.restructured", vendor),
       },
       extractionSpec: str(t.extraction_spec, "extraction_spec", vendor),
-      watches: watches.map((w) => ({
-        path: str(w.path, "watches[].path", vendor),
-        symbols: Array.isArray(w.symbols) ? w.symbols.map(String) : [],
-      })),
+      watches: watches.map((w) => {
+        const path = str(w.path, "watches[].path", vendor);
+
+        // An empty symbol list loads fine and then makes every breaking change look
+        // irrelevant for this path - a watch that silently watches nothing.
+        if (!Array.isArray(w.symbols) || w.symbols.length === 0) {
+          throw new ConfigError(`targets.yaml: "${path}" has no symbols to match`, { vendor, path });
+        }
+
+        return {
+          path,
+          symbols: w.symbols.map((symbol, i) => str(symbol, `watches[].symbols[${i}]`, vendor)),
+        };
+      }),
     } satisfies WatchTarget;
   });
 }

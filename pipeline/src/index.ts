@@ -23,7 +23,7 @@ function renderEvent(event: ChangeEvent): string[] {
   }
 
   return [
-    `  🔧 EXTRACTION BROKEN · ${event.reason}`,
+    `  🔧 EXTRACTION ${event.partial ? "DEGRADED" : "BROKEN"} · ${event.reason}`,
     `      cached: ${event.cachedHtmlPath}`,
     event.repairedSpec
       ? `      repair proposed: entry selector → "${event.repairedSpec.entry}"`

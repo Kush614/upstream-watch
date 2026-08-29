@@ -39,12 +39,32 @@ function normaliseDate(value: string): string {
 }
 
 /**
+ * Resolve a permalink against the page it was found on.
+ *
+ * Changelogs routinely use root-relative hrefs like "/changelog/release-1". Copied
+ * verbatim those fail the schema's `uri` format, so every entry would be dropped and the
+ * extraction would look broken when it was working perfectly.
+ */
+function resolveUrl(href: string, baseUrl: string): string {
+  if (!href) return "";
+  try {
+    return new URL(href, baseUrl).toString();
+  } catch {
+    return href;
+  }
+}
+
+/**
  * Extract entries from a page using the vendor's extraction spec.
  *
  * Returns [] when the spec matches nothing. The caller decides what that means -
  * for us it is a change event, not an error (specs/scraper-pipeline.md §4).
  */
-export function extractEntries(html: string, spec: ExtractionSpec): ChangelogEntry[] {
+export function extractEntries(
+  html: string,
+  spec: ExtractionSpec,
+  baseUrl = "",
+): ChangelogEntry[] {
   const root = parseHtml(html);
 
   return root.querySelectorAll(spec.entry).map((el) => ({
@@ -52,7 +72,7 @@ export function extractEntries(html: string, spec: ExtractionSpec): ChangelogEnt
     date: normaliseDate(readField(el, spec.fields.date)),
     title: readField(el, spec.fields.title),
     body: readField(el, spec.fields.body),
-    url: readField(el, spec.fields.url),
+    url: resolveUrl(readField(el, spec.fields.url), baseUrl),
     // Filled in by classify(); parsing does not decide what is breaking.
     breaking: false,
   }));

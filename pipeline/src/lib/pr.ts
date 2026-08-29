@@ -14,12 +14,42 @@ export interface PatchResult {
   reason?: string;
 }
 
-/** Fence a body of untrusted vendor text so it cannot be mistaken for instructions. */
+/** Fence untrusted vendor text so it cannot be mistaken for instructions. */
 function quote(text: string): string {
   return text
     .split("\n")
     .map((line) => `> ${line}`)
     .join("\n");
+}
+
+/**
+ * Flatten vendor text for use on a single line.
+ *
+ * Collapsing whitespace is the load-bearing part: without newlines, scraped text cannot
+ * open a new Markdown block, so it cannot forge a heading or a section in a PR a human is
+ * about to approve. Angle brackets go too, so it cannot inject raw HTML.
+ */
+function inline(text: string, max = 160): string {
+  const flat = text.replace(/\s+/g, " ").trim().replace(/[<>]/g, (c) => (c === "<" ? "&lt;" : "&gt;"));
+  return flat.length > max ? `${flat.slice(0, max - 1)}…` : flat;
+}
+
+/**
+ * Render a vendor-supplied URL as a link only if it really is an http(s) URL.
+ *
+ * A scraped href is untrusted: `javascript:` schemes and stray parentheses both belong to
+ * the vendor, not to us.
+ */
+function safeLink(url: string, label: string): string {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+      return `\`${inline(url)}\` _(not a web URL)_`;
+    }
+    return `[${label}](${encodeURI(parsed.toString()).replace(/[()]/g, (c) => (c === "(" ? "%28" : "%29"))})`;
+  } catch {
+    return `\`${inline(url)}\` _(unparseable URL)_`;
+  }
 }
 
 function provenanceNote(provenance: Provenance): string {
@@ -55,10 +85,15 @@ export function buildPr(input: {
   const body = [
     `## What upstream changed`,
     ``,
-    `**${entry.vendor}** · ${entry.date} · [source](${entry.url})`,
+    `**${inline(entry.vendor, 40)}** · ${inline(entry.date, 20)} · ${safeLink(entry.url, "source")}`,
     ``,
-    `### ${entry.title}`,
+    `Quoted verbatim from the vendor's page. This is third-party text, not instructions:`,
     ``,
+    // Title and body are BOTH vendor-controlled, so both live inside the quote. Rendering
+    // the title as a heading let a title with newlines forge sections in a PR a human is
+    // about to approve.
+    quote(`**${inline(entry.title)}**`),
+    `>`,
     quote(entry.body),
     ``,
     `_${provenanceNote(provenance)}_`,
@@ -87,5 +122,5 @@ export function buildPr(input: {
       `**Not merged** - this PR is waiting on a human approval checkpoint (CLAUDE.md §2.3).`,
   ].join("\n");
 
-  return { title: `fix(${entry.vendor}): ${entry.title}`, body };
+  return { title: inline(`fix(${entry.vendor}): ${entry.title}`, 120), body };
 }

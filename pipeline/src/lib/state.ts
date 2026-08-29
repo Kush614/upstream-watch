@@ -1,5 +1,6 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
+import { ConfigError } from "../errors.ts";
 import { fromRepoRoot } from "./paths.ts";
 import type { ChangelogEntry } from "../types.ts";
 
@@ -24,11 +25,27 @@ export function entryKey(entry: Pick<ChangelogEntry, "vendor" | "date" | "url" |
 }
 
 export async function loadState(file = STATE_FILE): Promise<State> {
+  let raw: string;
+
   try {
-    return JSON.parse(await readFile(fromRepoRoot(file), "utf8")) as State;
-  } catch {
-    // No state yet is the normal first-run case, not an error.
-    return {};
+    raw = await readFile(fromRepoRoot(file), "utf8");
+  } catch (cause) {
+    // A missing file is the normal first-run case. Anything else - a permission error,
+    // a transient I/O failure - must not be silently treated as "never seen anything",
+    // because that baselines the whole page and suppresses every change since the last
+    // good run.
+    if ((cause as NodeJS.ErrnoException)?.code === "ENOENT") return {};
+    throw new ConfigError(`Could not read state file ${file}`, { cause: String(cause) });
+  }
+
+  try {
+    return JSON.parse(raw) as State;
+  } catch (cause) {
+    throw new ConfigError(
+      `State file ${file} is not valid JSON. Delete it to start fresh, or fix it - ` +
+        `silently baselining would hide every change since the last good run.`,
+      { cause: String(cause) },
+    );
   }
 }
 
