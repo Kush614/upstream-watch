@@ -89,6 +89,10 @@ vendors:
       url:   { value: "https://platform.openai.com/docs/deprecations" }
     # Every row on this page is a scheduled removal, and the rows themselves never say so.
     breaking_default: true
+    # A row is "<date> <deprecated> <replacement>", so the body names the migration target
+    # too. Matching it would make every "migrate to X" notice look like ours the moment we
+    # start watching X. The thing being removed is always the title.
+    match_fields: [title]
     breaking_hint: ["deprecat", "shut down", "no longer", "removed", "read-only"]
 
   slack:

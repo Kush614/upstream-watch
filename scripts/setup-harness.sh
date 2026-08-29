@@ -26,6 +26,13 @@ SKILL_NAME="brightdata-changelog-scraper"
 
 [ -f "$ROOT/.env" ] && set -a && . "$ROOT/.env" && set +a
 
+# Secrets must never touch a predictable path. mktemp -d gives us 0700, and the trap
+# removes it even on failure — a symlink pre-created at /tmp/uw-*.json would otherwise
+# capture an API key, and a default umask leaves one world-readable until cleanup.
+TMP="$(mktemp -d "${TMPDIR:-/tmp}/upstream-watch.XXXXXX")"
+chmod 700 "$TMP"
+trap 'rm -rf "$TMP"' EXIT INT TERM
+
 ok()   { printf '  \033[32m✓\033[0m %s\n' "$1"; }
 skip() { printf '  \033[90m·\033[0m %s\n' "$1"; }
 warn() { printf '  \033[33m!\033[0m %s\n' "$1"; }
@@ -34,6 +41,15 @@ warn() { printf '  \033[33m!\033[0m %s\n' "$1"; }
 api() { curl -s -m 60 "${API//localhost/[::1]}$1" "${@:2}"; }
 code() { api "$1" -o /dev/null -w '%{http_code}' "${@:2}"; }
 count() { api "$1" | python3 -c "import json,sys;d=json.load(sys.stdin);print(len(d.get('data',[])) if 'data' in d else 0)" 2>/dev/null || echo 0; }
+
+# Idempotency has to be about THIS project's resources. "Some agent exists" is not the same
+# as "upstream-watch exists", and on a TrueForge install with other agents the count-based
+# check skipped creating the very things the saved agent references.
+has_named() { api "$1" | python3 -c "
+import json,sys
+try: d=json.load(sys.stdin).get('data',[])
+except Exception: sys.exit(1)
+sys.exit(0 if any(x.get('name')=='$2' for x in d) else 1)" 2>/dev/null; }
 
 echo
 echo "TrueForge setup — $API"
@@ -52,7 +68,7 @@ if [ "$(count /settings/model-providers)" -gt 0 ]; then
   skip "step 2: model provider already configured"
 elif [ -n "${OPENAI_API_KEY:-}" ] || [ -n "${ANTHROPIC_API_KEY:-}" ]; then
   # Build the manifest from the harness's own preset models so the properties are valid.
-  python3 - "$API" > /tmp/uw-mp.json <<'PY'
+  python3 - "$API" > "$TMP/mp.json" <<'PY'
 import json, os, sys, urllib.request
 api = sys.argv[1].replace("localhost", "[::1]")
 provider = "openai" if os.environ.get("OPENAI_API_KEY") else "anthropic"
@@ -62,21 +78,20 @@ preset = next(p for p in cat["data"] if p.get("type") == provider)
 print(json.dumps({"manifest": {"type": provider, "auth": {"api_key": key},
                                "models": preset["models"][:3]}}))
 PY
-  if [ "$(code /settings/model-providers -X POST -H 'content-type: application/json' --data-binary @/tmp/uw-mp.json)" = "201" ]; then
+  if [ "$(code /settings/model-providers -X POST -H 'content-type: application/json' --data-binary @"$TMP/mp.json")" = "201" ]; then
     ok "step 2: model provider configured"
   else
     warn "step 2: model provider request rejected"
   fi
-  rm -f /tmp/uw-mp.json
 else
   warn "step 2: no OPENAI_API_KEY or ANTHROPIC_API_KEY in .env — the agent cannot run without one"
 fi
 
 # ── 3. GitHub connector ──────────────────────────────────────────────────────
-if [ "$(count /settings/mcp-servers)" -gt 0 ]; then
-  skip "step 3: MCP connector already configured"
+if has_named /settings/mcp-servers github; then
+  skip "step 3: MCP connector 'github' already configured"
 elif command -v gh >/dev/null && gh auth token >/dev/null 2>&1; then
-  python3 - > /tmp/uw-mcp.json <<'PY'
+  python3 - > "$TMP/mcp.json" <<'PY'
 import json, subprocess
 tok = subprocess.check_output(["gh", "auth", "token"], text=True).strip()
 print(json.dumps({"manifest": {
@@ -84,36 +99,34 @@ print(json.dumps({"manifest": {
     "description": "GitHub MCP server: branches, pull requests, reviews, merges.",
     "auth": {"type": "header", "headers": {"Authorization": f"Bearer {tok}"}}}}))
 PY
-  if [ "$(code /settings/mcp-servers -X POST -H 'content-type: application/json' --data-binary @/tmp/uw-mcp.json)" = "201" ]; then
+  if [ "$(code /settings/mcp-servers -X POST -H 'content-type: application/json' --data-binary @"$TMP/mcp.json")" = "201" ]; then
     ok "step 3: GitHub connector configured (header PAT via gh auth token)"
   else
     warn "step 3: GitHub connector request rejected"
   fi
-  rm -f /tmp/uw-mcp.json
 else
   warn "step 3: gh not authenticated — run \`gh auth login\`"
 fi
 
 # ── 4. skill ─────────────────────────────────────────────────────────────────
-if [ "$(count /settings/skills)" -gt 0 ]; then
-  skip "step 4: skill already registered"
+if has_named /settings/skills "$SKILL_NAME"; then
+  skip "step 4: skill '$SKILL_NAME' already registered"
 else
   DESC=$(python3 -c "
 import re,sys
 s=open('$ROOT/skills/$SKILL_NAME/SKILL.md').read()
 print(re.search(r'^description:\s*(.+)$', s, re.M).group(1))")
-  python3 - "$SKILL_NAME" "$REPO_URL" "$SKILL_REF" "$DESC" > /tmp/uw-skill.json <<'PY'
+  python3 - "$SKILL_NAME" "$REPO_URL" "$SKILL_REF" "$DESC" > "$TMP/skill.json" <<'PY'
 import json, sys
 name, url, ref, desc = sys.argv[1:5]
 print(json.dumps({"manifest": {"type": "git", "name": name, "url": url,
                                "path": f"skills/{name}", "ref": ref, "description": desc}}))
 PY
-  if [ "$(code /settings/skills -X POST -H 'content-type: application/json' --data-binary @/tmp/uw-skill.json)" = "201" ]; then
+  if [ "$(code /settings/skills -X POST -H 'content-type: application/json' --data-binary @"$TMP/skill.json")" = "201" ]; then
     ok "step 4: skill registered from $REPO_URL@$SKILL_REF"
   else
     warn "step 4: skill request rejected (is $SKILL_REF pushed?)"
   fi
-  rm -f /tmp/uw-skill.json
 fi
 
 # ── 5. sandbox ───────────────────────────────────────────────────────────────
@@ -122,7 +135,7 @@ if api /settings/sandbox-providers | grep -q '"type"'; then
 elif [ -n "${DAYTONA_API_KEY:-}" ]; then
   # SandboxProviderManifest: the key lives under auth, and the four interval fields are
   # all required — so take them from the harness's own catalog rather than inventing them.
-  python3 - "$API" > /tmp/uw-sb.json <<'PY'
+  python3 - "$API" > "$TMP/sb.json" <<'PY'
 import json, os, sys, urllib.request
 api = sys.argv[1].replace("localhost", "[::1]")
 cat = json.load(urllib.request.urlopen(f"{api}/catalogs/sandbox-providers", timeout=15))
@@ -130,12 +143,11 @@ preset = next(p for p in cat["data"] if p.get("type") == "daytona")
 manifest = {**preset, "auth": {"api_key": os.environ["DAYTONA_API_KEY"]}}
 print(json.dumps({"manifest": manifest}))
 PY
-  if [ "$(code /settings/sandbox-providers -X PUT -H 'content-type: application/json' --data-binary @/tmp/uw-sb.json)" = "200" ]; then
+  if [ "$(code /settings/sandbox-providers -X PUT -H 'content-type: application/json' --data-binary @"$TMP/sb.json")" = "200" ]; then
     ok "step 5: Daytona sandbox configured"
   else
     warn "step 5: Daytona request rejected"
   fi
-  rm -f /tmp/uw-sb.json
 else
   warn "step 5: no DAYTONA_API_KEY in .env"
   warn "        the LOCAL sandbox cannot run this project: it denies /Library/Developer"
@@ -146,10 +158,10 @@ fi
 # ── 6 + 7. compose and save the agent ────────────────────────────────────────
 MODEL=$(api /models | python3 -c "import json,sys;d=json.load(sys.stdin)['data'];print(d[-1]['name'] if d else '')" 2>/dev/null || true)
 
-if [ "$(count /agents)" -gt 0 ]; then
+if has_named /agents "$AGENT_NAME"; then
   skip "step 6+7: agent '$AGENT_NAME' already saved"
 elif [ -n "$MODEL" ]; then
-  python3 - "$MODEL" "$ROOT" "$SKILL_NAME" > /tmp/uw-agent.json <<'PY'
+  python3 - "$MODEL" "$ROOT" "$SKILL_NAME" > "$TMP/agent.json" <<'PY'
 import json, sys
 model, root, skill = sys.argv[1:4]
 print(json.dumps({"name": "upstream-watch", "manifest": {
@@ -161,12 +173,11 @@ print(json.dumps({"name": "upstream-watch", "manifest": {
     "skills": [{"name": skill}],
     "config": {"sandbox": {"enabled": True}, "dynamic_sub_agents": {"enabled": True}}}}))
 PY
-  if [ "$(code /agents -X POST -H 'content-type: application/json' --data-binary @/tmp/uw-agent.json)" = "201" ]; then
+  if [ "$(code /agents -X POST -H 'content-type: application/json' --data-binary @"$TMP/agent.json")" = "201" ]; then
     ok "step 6+7: agent '$AGENT_NAME' saved on $MODEL, merge_pull_request gated"
   else
     warn "step 6+7: agent request rejected"
   fi
-  rm -f /tmp/uw-agent.json
 else
   warn "step 6+7: no model available — configure step 2 first"
 fi

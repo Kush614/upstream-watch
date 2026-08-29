@@ -1,6 +1,9 @@
 /**
- * What the panels render. Mirrors the pipeline's ChangeEvent and the patcher contract in
- * specs/patcher.md, plus the session summary the orchestrator maintains.
+ * What the panels render.
+ *
+ * Everything here is recovered from the harness's own event stream — see adapter.ts.
+ * Nothing is synthesised: if a field cannot be recovered it stays empty or null, so the
+ * UI can say "unknown" rather than assert something nothing established.
  */
 
 export type StepKind =
@@ -19,7 +22,6 @@ export interface ChangelogExcerpt {
   vendor: string;
   date: string;
   title: string;
-  /** <= 40 words (specs/agent.md §Approval checkpoint). */
   body: string;
   url: string;
   breaking: boolean;
@@ -28,15 +30,22 @@ export interface ChangelogExcerpt {
 
 export interface PendingApproval {
   id: string;
+  /** e.g. "github: merge_pull_request" — the actual gated MCP call. */
   action: string;
   entry: ChangelogExcerpt;
+  rationale: string;
   files: string[];
+  /** Unified diff from the patcher subagent. */
   diff: string;
-  /** null = we do not know. Never assume passing: a human is about to merge on this. */
+  /** null = unknown. Never assume passing: a human is about to merge on this. */
   testsPassed: boolean | null;
   testOutput: string;
+  /** "live" or "cache" — whether the changelog behind this was actually fetched. */
+  provenance: string;
   prUrl: string;
   prNumber: number;
+  prTitle: string;
+  prBranch: string;
 }
 
 export interface DoneItem {
@@ -45,8 +54,16 @@ export interface DoneItem {
   title: string;
   prUrl: string;
   prNumber: number;
+  branch: string;
   status: "open" | "merged" | "draft" | "rejected";
   at: string;
+}
+
+export interface VendorStatus {
+  vendor: string;
+  /** "live" = Bright Data fetched it this run; "cache" = replayed a committed capture. */
+  provenance: string;
+  entries: number;
 }
 
 export interface SessionSummary {
@@ -57,11 +74,20 @@ export interface SessionSummary {
   pendingApprovals: number;
 }
 
+export interface SessionRefLite {
+  id: string;
+  title: string | null;
+  createdAt: string;
+}
+
 export interface SessionState {
   connected: boolean;
-  /** Set when the harness answered but part of the read failed. */
-  error?: string;
   source: "trueforge" | "local";
+  error?: string;
+  sessionId?: string;
+  sessionTitle?: string | null;
+  sessions?: SessionRefLite[];
+  vendors: VendorStatus[];
   summary: SessionSummary;
   steps: Step[];
   pending: PendingApproval[];

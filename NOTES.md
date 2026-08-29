@@ -331,3 +331,28 @@ use it.
 improvise a policy, a quota nobody was watching, and me not following my own instruction. The
 fix for the first two was to *encode* the decision rather than hope for it — a prompt that says
 "do the right thing" is not a specification.
+
+## 2026-08-30 — I deleted the branches my own pull requests were standing on
+
+**Where:** the PR stack, #1–#4
+**Symptom:** Merging four stacked PRs bottom-up with `gh pr merge --merge --delete-branch`,
+#1 and #3 merged; **#2 and #4 closed themselves**. Not merged — closed.
+**Cause:** The stack was `feat/demo ← feat/pipeline ← feat/agent ← feat/spec-align`, each PR
+based on the one below. `--delete-branch` removed `feat/demo` and `feat/agent` the moment they
+merged, and a pull request whose base branch no longer exists is closed by GitHub rather than
+retargeted. Worse, a closed PR whose base is gone cannot be reopened at all — `gh pr reopen`
+returns *"Cannot change the base branch of a closed pull request"*. Two reviewed PRs, one of
+them carrying 22 commits and a clean Qodo pass, unrecoverable as PRs.
+**Fix:** Nothing was lost — `feat/spec-align` was intact locally and on the remote the whole
+time, and the review history on #1–#4 survives as evidence. But the stack could not be
+reassembled, so the work went to `main` as a single new PR with the prior review status carried
+over in its description.
+**Lesson:** `--delete-branch` is safe on an isolated PR and quietly destructive on a stacked
+one. Either merge stacks top-down, or retarget each PR's base *before* merging the one beneath
+it, or simply do not delete branches until the whole stack has landed. The irreversible part
+was not the merge — it was the cleanup flag attached to it, which is a bad place to put
+irreversibility.
+
+There is an irony worth keeping: this project exists to stop an agent from doing something
+irreversible without asking. I did the irreversible thing to myself, by hand, with a convenience
+flag I did not think about.

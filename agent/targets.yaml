@@ -30,7 +30,12 @@ vendors:
     url: https://platform.openai.com/docs/deprecations
     schema: schemas/changelog-entry.json
     # The model demo-app/src/risk.ts is pinned to, plus API surfaces it could grow into.
-    symbols: [gpt-5-mini-2025-08-07, gpt-5-mini, v1/prompts, chat/completions]
+    # Watch BOTH the model we were pinned to and the one we migrate to. A patch that
+    # changes RISK_MODEL without adding the new identifier here silently stops watching
+    # the replacement: its future deprecation would be classified breaking-only and never
+    # patched. specs/patcher.md forbids the patcher touching this file, so the orchestrator
+    # keeps it in step — see specs/agent.md §The loop.
+    symbols: [gpt-5.6-terra, gpt-5-mini-2025-08-07, gpt-5-mini, v1/prompts, chat/completions]
     files: [demo-app/src/risk.ts]
 
   slack:

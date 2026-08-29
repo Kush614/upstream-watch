@@ -6,7 +6,7 @@ describe("OpenAI risk check", () => {
   it("uses the model this service is pinned to", () => {
     // Pinned deliberately: OpenAI publishes a shutdown date for this model, so when the
     // deprecation lands this assertion is what has to change alongside the call.
-    expect(RISK_MODEL).toBe("gpt-5-mini-2025-08-07");
+    expect(RISK_MODEL).toBe("gpt-5.6-terra");
   });
 
   it("builds a prompt carrying the facts a reviewer needs", () => {

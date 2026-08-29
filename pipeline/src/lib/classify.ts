@@ -26,8 +26,16 @@ export function classify(
   entry: Pick<ChangelogEntry, "title" | "body" | "breaking">,
   breakingHints: string[],
   symbols: string[],
+  matchFields: Array<"title" | "body"> = ["title", "body"],
 ): Classification {
   const haystack = `${entry.title}\n${entry.body}`.toLowerCase();
+
+  // Symbol matching may be narrowed to the title, for vendors whose body names the
+  // replacement as well as the thing being removed.
+  const symbolHay = matchFields
+    .map((f) => (f === "title" ? entry.title : entry.body))
+    .join("\n")
+    .toLowerCase();
 
   const reasons: string[] = [];
   if (entry.breaking) reasons.push("vendor-flagged");
@@ -36,7 +44,7 @@ export function classify(
     if (hint && haystack.includes(hint.toLowerCase())) reasons.push(`hint:${hint}`);
   }
 
-  const matched = symbols.filter((symbol) => symbol && haystack.includes(symbol.toLowerCase()));
+  const matched = symbols.filter((symbol) => symbol && symbolHay.includes(symbol.toLowerCase()));
 
   return { breaking: reasons.length > 0, reasons, symbols: matched };
 }
