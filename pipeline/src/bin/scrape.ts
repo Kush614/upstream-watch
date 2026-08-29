@@ -8,6 +8,7 @@
  *   --vendor <v>   one vendor; omit for every vendor in targets.yaml
  *   --pretty       human-readable render instead of JSON
  *   --no-persist   do not record entries as seen (inspect without consuming)
+ *   --relevant     emit only the events that touch watched code, plus counts of the rest
  */
 
 import { appendNote } from "../lib/notes.ts";
@@ -82,10 +83,29 @@ async function main(): Promise<void> {
 
   const runs = await scrapeAll(vendors, { persist: !process.argv.includes("--no-persist") });
 
+  const events = runs.flatMap((r) => r.events);
+
   if (process.argv.includes("--pretty")) {
     console.log(render(runs));
+  } else if (process.argv.includes("--relevant")) {
+    // A single OpenAI run yields ~86 new entries, nearly all deprecations of models this
+    // repo never calls. Handing all of that back verbatim makes a watcher subagent page
+    // 40 kB of JSON through its context to say "one of these matters". Emit what is
+    // actionable, and a count of what is not.
+    const ours = events.filter((e) => e.type === "change" && e.relevance === "symbol-match");
+    const other = events.filter((e) => e.type === "change" && e.relevance === "breaking-only");
+    const problems = events.filter((e) => e.type !== "change");
+
+    console.log(JSON.stringify({
+      events: [...ours, ...problems],
+      otherBreaking: other.length,
+      otherBreakingTitles: other.slice(0, 5).map((e) => (e.type === "change" ? e.entry.title : "")),
+      vendors: runs.map((r) => ({
+        vendor: r.vendor, provenance: r.provenance, valid: r.valid, added: r.added, firstRun: r.firstRun,
+      })),
+    }, null, 2));
   } else {
-    console.log(JSON.stringify(runs.flatMap((r) => r.events), null, 2));
+    console.log(JSON.stringify(events, null, 2));
   }
 
   // A scrape that could not fetch at all is a real failure; surface it in the exit code

@@ -54,6 +54,35 @@ describe("openai — deprecation tables via css", () => {
   });
 });
 
+describe("the relevance split that --relevant reports", () => {
+  it("separates the two events that touch our code from the ~84 that do not", async () => {
+    const { scrapeVendor } = await import("../src/scrape.ts");
+    const { CachedScraperClient } = await import("../src/clients/index.ts");
+    const { tempStateFile, seedState, cleanup } = await import("./helpers.ts");
+
+    const stateFile = tempStateFile();
+    // A returning run that has not yet seen the newer deprecations.
+    await seedState(stateFile, { vendor: "openai", seen: [] });
+
+    const run = await scrapeVendor("openai", {
+      client: new CachedScraperClient("agent/fixtures/html/openai/current.html"),
+      stateFile,
+      persist: false,
+    });
+
+    const ours = run.events.filter((e) => e.type === "change" && e.relevance === "symbol-match");
+    const other = run.events.filter((e) => e.type === "change" && e.relevance === "breaking-only");
+
+    // This ratio is the whole reason --relevant exists: handing a watcher subagent all of
+    // these verbatim is 40 kB of JSON to say that two of them matter.
+    expect(ours.length).toBeGreaterThan(0);
+    expect(other.length).toBeGreaterThan(ours.length * 10);
+    expect(ours.some((e) => e.type === "change" && e.symbols.includes("gpt-5-mini-2025-08-07"))).toBe(true);
+
+    await cleanup([stateFile]);
+  });
+});
+
 describe("slack — schema.org JSON-LD via embedded-json", () => {
   it("extracts every blogPost cleanly", async () => {
     const entries = extractEntries(await capture("slack"), await loadSpec("slack"));

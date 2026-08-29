@@ -11,7 +11,12 @@ by the Upstream Watch orchestrator for each vendor in `agent/targets.yaml`.
 
 ## Steps
 1. Read the vendor block below for `url` and extraction spec.
-2. Run: `pnpm --filter pipeline scrape --vendor <vendor>`
+2. Run: `pnpm --filter pipeline scrape --vendor <vendor> -- --relevant`
+
+   Always pass `--relevant`. It returns the events that touch watched code plus a count of
+   the breaking changes elsewhere. Without it a single vendor can hand you ~86 entries and
+   40 kB of JSON, nearly all of which is deprecations of things this repo never calls — and
+   paging that through context to find the one that matters is pure waste.
    (wraps the Bright Data Web Unlocker API: `POST https://api.brightdata.com/request`
    with `{zone, url, format: "raw"}` and `Authorization: Bearer $BRIGHTDATA_API_KEY`)
 3. Confirm raw HTML was cached under `agent/fixtures/html/<vendor>/`.
