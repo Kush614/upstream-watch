@@ -112,3 +112,34 @@ describe("diff", () => {
     expect(state.lastCheck).not.toBeNull();
   });
 });
+
+describe("match_fields — watching a replacement without drowning in it", () => {
+  const SYMS = ["gpt-5.6-terra", "gpt-5-mini-2025-08-07"];
+
+  it("matches when the watched identifier is the thing being deprecated", () => {
+    // A future row will read "<date> gpt-5.6-terra <next>", with terra as the TITLE.
+    const row = entry({ title: "`gpt-5.6-terra`", body: "Mar 1, 2027`gpt-5.6-terra``gpt-6`", breaking: true });
+
+    expect(classify(row, HINTS, SYMS, ["title"]).symbols).toContain("gpt-5.6-terra");
+  });
+
+  it("does not match when it is merely the replacement named in the row", () => {
+    // "gpt-3.5-turbo-0125 → gpt-5.6-terra" is somebody else's migration, not ours.
+    const row = entry({
+      title: "`gpt-3.5-turbo-0125`",
+      body: "Oct 23, 2026`gpt-3.5-turbo-0125``gpt-5.6-terra`",
+      breaking: true,
+    });
+
+    expect(classify(row, HINTS, SYMS, ["title"]).symbols).toEqual([]);
+    // …and matching the body, as the default does, would wrongly claim it.
+    expect(classify(row, HINTS, SYMS).symbols).toContain("gpt-5.6-terra");
+  });
+
+  it("defaults to title and body, which is right for vendors that list affected symbols", () => {
+    // Stripe puts the API surface in the body; narrowing to the title would lose it.
+    const row = entry({ title: "Removes a parameter", body: "Affected: PaymentIntent#create" });
+
+    expect(classify(row, HINTS, ["PaymentIntent#create"]).symbols).toContain("PaymentIntent#create");
+  });
+});

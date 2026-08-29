@@ -48,6 +48,9 @@ function normaliseSpec(vendor: string, raw: Record<string, unknown>): Extraction
     fields: raw.fields as ExtractionSpec["fields"],
     json: raw.json as ExtractionSpec["json"],
     breaking_default: raw.breaking_default === true,
+    match_fields: Array.isArray(raw.match_fields)
+      ? (raw.match_fields.filter((f) => f === "title" || f === "body") as Array<"title" | "body">)
+      : undefined,
     breaking_hint: Array.isArray(raw.breaking_hint) ? raw.breaking_hint.map(String) : [],
   };
 }

@@ -104,7 +104,7 @@ export async function scrapeVendor(vendor: string, options: ScrapeOptions = {}):
     return { ...base, added: added.length, firstRun: true };
   }
 
-  return { ...base, added: added.length, events: toEvents(added, target.symbols, spec.breaking_hint, target.files, vendor) };
+  return { ...base, added: added.length, events: toEvents(added, target.symbols, spec.breaking_hint, target.files, vendor, spec.match_fields) };
 }
 
 function toEvents(
@@ -113,11 +113,12 @@ function toEvents(
   hints: string[],
   files: string[],
   vendor: string,
+  matchFields?: Array<"title" | "body">,
 ): ChangeEvent[] {
   const events: ChangeEvent[] = [];
 
   for (const entry of added) {
-    const { breaking, symbols: matched } = classify(entry, hints, symbols);
+    const { breaking, symbols: matched } = classify(entry, hints, symbols, matchFields);
 
     // The orchestrator keeps events that are breaking OR mention a watched symbol
     // (specs/agent.md §2). Anything else is noise and never reaches it.

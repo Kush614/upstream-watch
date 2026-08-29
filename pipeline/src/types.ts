@@ -85,6 +85,15 @@ export interface ExtractionSpec {
    * what the page as a whole obviously is.
    */
   breaking_default?: boolean;
+  /**
+   * Which fields symbol matching may look at. Defaults to title + body.
+   *
+   * A deprecations table's row reads "<date> <deprecated> <replacement>", so the body
+   * mentions the migration TARGET as well as the thing going away. Watching a replacement
+   * identifier then makes every "migrate to X" notice look like ours. The thing being
+   * deprecated is always the title, so such a vendor matches on `[title]` alone.
+   */
+  match_fields?: Array<"title" | "body">;
   breaking_hint: string[];
 }
 
