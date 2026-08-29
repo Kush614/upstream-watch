@@ -120,11 +120,16 @@ fi
 if api /settings/sandbox-providers | grep -q '"type"'; then
   skip "step 5: sandbox provider already configured"
 elif [ -n "${DAYTONA_API_KEY:-}" ]; then
-  # Shape is SandboxProviderManifest: the key lives under auth, not at the top level.
-  python3 -c "
-import json, os
-print(json.dumps({'manifest': {'type': 'daytona',
-                               'auth': {'api_key': os.environ['DAYTONA_API_KEY']}}}))" > /tmp/uw-sb.json
+  # SandboxProviderManifest: the key lives under auth, and the four interval fields are
+  # all required — so take them from the harness's own catalog rather than inventing them.
+  python3 - "$API" > /tmp/uw-sb.json <<'PY'
+import json, os, sys, urllib.request
+api = sys.argv[1].replace("localhost", "[::1]")
+cat = json.load(urllib.request.urlopen(f"{api}/catalogs/sandbox-providers", timeout=15))
+preset = next(p for p in cat["data"] if p.get("type") == "daytona")
+manifest = {**preset, "auth": {"api_key": os.environ["DAYTONA_API_KEY"]}}
+print(json.dumps({"manifest": manifest}))
+PY
   if [ "$(code /settings/sandbox-providers -X PUT -H 'content-type: application/json' --data-binary @/tmp/uw-sb.json)" = "200" ]; then
     ok "step 5: Daytona sandbox configured"
   else

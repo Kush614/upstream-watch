@@ -194,3 +194,37 @@ borrowing the host's.
 saying plainly in the pitch: the sandbox is not decoration and not a checkbox — the moment the
 agent needed to run our code, the isolated environment was the only thing that could, and the
 laptop it was running on was correctly refused.
+
+## 2026-08-30 — Daytona works; the sandbox image is barer than the contract assumed
+
+**Where:** `agent/prompts/orchestrator.md`, `specs/agent.md`, TrueForge sandbox settings
+**Symptom:** With Daytona configured, `exec` finally ran for real — exit 0 in a Debian
+container. Then a cascade, each one uncovering the next:
+
+```
+pnpm: command not found            → tried corepack
+corepack: command not found        → tried npm
+npm: command not found             → "Bootstrap failed", agent stopped
+xz: Cannot exec                    → .tar.xz could not be unpacked
+```
+
+**Cause:** Probing it directly settled what guessing could not. The image is Debian 12,
+running as **root**, with `git`, `curl`, `python3` and `apt-get` — and **no Node, npm, pnpm,
+corepack or xz**. `specs/patcher.md` §Steps says "clone the repo; `pnpm install
+--frozen-lockfile`", which quietly assumes a toolchain that is not there. The sandbox also
+defaults to `exec_timeout_ms: 60000`, and downloading Node plus installing a pnpm workspace
+does not fit in 60 seconds.
+
+**Fix:** The orchestrator bootstrap now installs Node from the official **`.tar.gz`** build
+into `/opt/node` before cloning, and every later command re-exports `PATH` because each `exec`
+is a fresh shell. `exec_timeout_ms` raised to 600000.
+
+**Lesson:** The agent behaved better than the prompt did. Told "if bootstrap fails, report the
+exact failing command and stop; do not improvise a substitute", it tried three package
+managers, then stopped and printed four facts — rather than inventing a workaround that would
+have half-worked and wasted an hour. The instruction that paid off was the one telling it when
+*not* to be resourceful.
+
+Second lesson: I wrote `.tar.xz` because that is the download I reach for by habit. One probe
+of the actual image would have told me `xz` was missing before I spent a round-trip on it —
+the same mistake as assuming Bright Data could reach Stripe.
