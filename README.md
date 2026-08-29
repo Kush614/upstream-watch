@@ -76,37 +76,59 @@ pnpm demo:seed                  # loads fixtures + seeded breaking change
 
 `DEMO_MODE=1` serves cached HTML from `agent/fixtures/` instead of hitting Bright Data.
 
-### Seeing it work without the harness
+### Seeing it work
 
-The detection half runs standalone, no accounts required:
+The detection half runs standalone. With Bright Data credentials it scrapes live; without
+them, `DEMO_MODE=1` replays the committed capture of the real page:
 
 ```bash
-pnpm demo:seed                                            # cold start
-DEMO_MODE=1 DEMO_FIXTURE=breaking   pnpm check            # finds the breaking change
-DEMO_MODE=1 DEMO_FIXTURE=restructured pnpm check          # vendor redesigned the page
+pnpm check                                  # live via Bright Data
+DEMO_MODE=1 pnpm check                      # replay the committed real capture
+
+pnpm demo:rewind --since 2026-08-20         # forget the latest release
+DEMO_MODE=1 pnpm check                      # ...and watch it come back as new
 ```
 
-The first prints the seeded breaking change, which symbols matched, and which of our files it
-affects. The second prints nothing extracted — and a repaired extraction spec, derived from the
-cached HTML and validated before it is proposed.
+Output from the second pair, against Stripe's actual changelog data:
 
 ```
-stripe — 5 entries (fixture), 1 new
-  ⚠ BREAKING · 2026-08-28 · The `source` parameter on the Charges API is deprecated
-      matched `source`, `/v1/charges`, `Charges API` → demo-app/src
+stripe — 40/40 entries valid (cache), 21 new
+  ⚠ BREAKING · OURS 2026-08-26 — Removes support for specifying payment method types…
+      symbols: payment_intents, PaymentIntent#create → demo-app/src/payments.ts
+  · breaking elsewhere 2026-08-26 — Adds support for disabling payout methods
+      no watched symbol matched — reported, not patched
+
+1 change(s) touch our code and need a patch; 3 other breaking change(s) reported only.
+```
+
+Nothing there is invented. Stripe publishes its own `breaking` flag and the exact API
+symbols each entry changes; `demo:rewind` only rewinds *our* memory of what we had seen.
+
+### When the vendor redesigns their page
+
+```bash
+pnpm demo:break-page                        # same entries, restructured DOM
+DEMO_MODE=1 pnpm check                      # SchemaMismatch, not a crash
+pnpm repair --vendor stripe                 # build the repair context
+pnpm validate-spec --vendor stripe --spec <candidate>   # gate the proposal
+pnpm demo:restore-page
+```
+
+### The UI
+
+```bash
+pnpm demo:feed && pnpm ui                   # three panels on :5173
 ```
 
 ### Status
 
 | Step | State |
 | --- | --- |
-| D1 detect | ✅ working, 39 tests |
-| D2 patch in a sandbox | ⏳ needs Daytona configured |
-| D3 PR via GitHub MCP | ⏳ PR body built and tested; needs the MCP connector |
-| D4 approval gate | ✅ gate implemented and tested · ⏳ needs harness wiring |
-| D5 session persistence | ⏳ harness |
-| D6 approve → merge | ⏳ harness |
-| D7 self-repair | ✅ detection + repair working · ⏳ PR for the spec change |
+| Detect (Bright Data → parse → diff → relevance) | ✅ live, 81 tests |
+| Self-repair (mismatch → context → validated candidate) | ✅ working; the model proposes the spec |
+| PR body + approval gate | ✅ implemented and tested |
+| Approval card / Doing / Did panels | ✅ built; wire `adapter.ts` to the harness |
+| Sandbox patch + PR + merge | ⏳ needs Daytona and the GitHub MCP connector |
 
 ## Demo
 
@@ -115,31 +137,27 @@ hit are in [`CLAUDE.md`](CLAUDE.md) §9.
 
 ## Qodo Code Review Evidence
 
-Every change to this repo goes through a pull request, and every PR is reviewed by Qodo before
-it merges. Direct pushes to `main` are a non-negotiable in [`CLAUDE.md`](CLAUDE.md) §2.
+- **Representative PR:** [#2 — feat(pipeline): scrape, parse, diff, relevance, and self-repair](https://github.com/Kush614/upstream-watch/pull/2)
+- **What Qodo found / what changed or was dismissed:** 14 findings across [#1](https://github.com/Kush614/upstream-watch/pull/1)–[#3](https://github.com/Kush614/upstream-watch/pull/3), **0 dismissed as invalid**. The one worth reading: this project states in three files that changelog text is untrusted, and `buildPr` quoted the changelog *body* while interpolating the vendor-controlled *title* straight into a Markdown heading — so a title containing newlines could forge sections in a PR a human was about to approve. Also caught partial schema failures silently dropping entries, a corrupt state file being treated as a cold start, and `provenance` defaulting to `fixture` so a live run could publish a PR claiming cached data. All fixed with regression tests.
+- **Review history:** each PR carries a finding-by-finding disposition comment and a follow-up Qodo review ([#1](https://github.com/Kush614/upstream-watch/pull/1), [#2](https://github.com/Kush614/upstream-watch/pull/2), [#3](https://github.com/Kush614/upstream-watch/pull/3)). Follow-up counts went 2→1 (the remaining one a false positive, dismissed with evidence), 7→0, 5→0.
 
-**Representative PR: [#2 — feat(pipeline): scrape, parse, diff, relevance, and self-repair](https://github.com/Kush614/upstream-watch/pull/2)**
-
-| PR | What Qodo found | What we did |
-| --- | --- | --- |
-| [#1](https://github.com/Kush614/upstream-watch/pull/1) | 2 bugs: a `targets.yaml` reference to a file that did not exist yet, and `amountCents <= 0` letting `1.5`, `NaN` and `Infinity` reach Stripe | Both fixed. Moved the extraction spec into the PR that owns the fixtures it describes; `amountCents` now requires a positive integer. 5 → 9 tests |
-| [#2](https://github.com/Kush614/upstream-watch/pull/2) | 7 bugs, incl. partial schema failures silently dropping entries, a corrupt state file being treated as a cold start, and **vendor-controlled titles injecting Markdown into the PR body** | All 7 fixed, each with a regression test. 34 → 49 tests |
-| [#3](https://github.com/Kush614/upstream-watch/pull/3) | 5 bugs, incl. `provenance` defaulting to `fixture` so a live run could publish a PR claiming cached data, and a patcher prompt that forbade reading the test it was required to update | 3 fixed here, 2 fixed further down the stack where the code lives |
-
-**14 findings, 0 dismissed.** Every one was real. The one worth reading is
-[#2's Markdown injection](https://github.com/Kush614/upstream-watch/pull/2): this project states
-in three separate files that changelog text is untrusted data, and `buildPr` carefully quoted the
-changelog *body* while interpolating the vendor-controlled *title* straight into a Markdown
-heading — so a title containing newlines could forge sections in a PR a human was about to
-approve. Our tests all passed, because they were written by the same mind that wrote the bug.
-
-The full write-up is in [`NOTES.md`](NOTES.md). Each PR carries a comment with the finding-by-
-finding disposition and the reasoning, per [`specs/qodo-workflow.md`](specs/qodo-workflow.md).
+Agent-generated PRs — patches and scraper repairs — go through the same flow. That is the
+point: the agent's code is held to the bar the humans' code is held to.
 
 ## Build log
 
 [`NOTES.md`](NOTES.md) is the running log of everything that broke and how it was fixed. It is
 the source for the write-up.
+
+## Add a vendor
+
+1. Add a block to [`agent/targets.yaml`](agent/targets.yaml) — `url`, `schema`, the
+   `symbols` you call, and the `files` those symbols can break.
+2. Add a matching extraction block to the YAML in
+   [`skills/brightdata-changelog-scraper/SKILL.md`](skills/brightdata-changelog-scraper/SKILL.md).
+   Use `strategy: css` with an `entry_selector` unless the vendor ships its changelog as
+   embedded JSON, as Stripe does.
+3. `pnpm scrape --vendor <name>` — the first run baselines silently; the second reports changes.
 
 ## Repo layout
 

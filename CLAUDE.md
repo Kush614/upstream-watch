@@ -79,45 +79,86 @@ Demo mode: `DEMO_MODE=1` makes the pipeline serve cached HTML from `agent/fixtur
 Commands the agent and the demo actually use:
 
 ```bash
-pnpm check                       # one pass over every watched target, rendered for a human
-pnpm check --json                # same run, structured — this is what the agent consumes
-pnpm check --json --no-persist   # inspect without marking entries as seen
-pnpm verify                      # typecheck + tests; what the patcher runs in the sandbox
-pnpm pr:body                     # JSON on stdin -> PR title + description on stdout
-pnpm demo:seed                   # reset state, baseline the fixtures, ready for a cold run
+pnpm check                          # one pass over every vendor, rendered for a human
+pnpm scrape --vendor stripe         # same run, ChangeEvent JSON on stdout (the agent reads this)
+pnpm scrape -- --no-persist         # inspect without recording entries as seen
+pnpm repair --vendor stripe         # build repair-context.json after a SchemaMismatch
+pnpm validate-spec --vendor stripe --spec <file>   # gate a proposed extraction spec
+pnpm verify                         # typecheck + tests; what the patcher runs in the sandbox
+pnpm pr:body                        # JSON on stdin -> PR title + body on stdout
+pnpm ui                             # the three panels on :5173
+pnpm demo:feed                      # write ui/public/session.json from a real scrape
+pnpm demo:rewind --since 2026-08-20 # forget a release so real entries show as new
+pnpm demo:break-page                # swap in the restructured page; demo:restore-page undoes it
 ```
 
-`DEMO_FIXTURE` selects which committed fixture demo mode serves: `baseline` (default),
-`breaking` (the seeded change), or `restructured` (the vendor redesigned their page — drives
-self-repair).
-
-**Re-run `pnpm demo:seed` before every rehearsal.** Without `--no-persist`, a run records what
-it saw, so a second run correctly reports nothing new — which looks like a broken demo.
+**Live is the default.** `DEMO_MODE=1` opts *out*, replaying the cached `current.html` —
+the fallback in `docs/PLAN.md`, not the normal path.
 
 ## 6. Bright Data scraper settings (rules for the coding assistant)
 
 These settings are reused automatically by Claude Code. Do not ask the user for them.
 
 ```yaml
-# Bright Data — Scraper Studio
+# Bright Data — Web Unlocker API
 provider: brightdata
-tool: scraper-studio            # driven via CLI, never via dashboard during the day
-auth: env:BRIGHTDATA_API_KEY
-zone: env:BRIGHTDATA_ZONE       # VERIFY zone name from Bright Data setup
+tool: web-unlocker                # POST https://api.brightdata.com/request
+auth: env:BRIGHTDATA_API_KEY      # Authorization: Bearer <key>
+zone: env:BRIGHTDATA_ZONE
 output: json
 schema: schemas/changelog-entry.json   # {vendor, date, title, body, url, breaking: bool}
 retry: 3
-on_schema_mismatch: repair      # see specs/scraper-pipeline.md §4
-cache_dir: agent/fixtures/html
+on_schema_mismatch: repair        # see specs/scraper-pipeline.md §4
+cache_dir: agent/fixtures/html/<vendor>/   # newest 5 kept, plus current.html + last-good.html
 targets_file: agent/targets.yaml
+extraction_specs: skills/brightdata-changelog-scraper/SKILL.md   # the YAML block
 ```
+
+Working invocation, verified against
+<https://docs.brightdata.com/scraping-automation/web-unlocker/send-your-first-request>:
+
+```bash
+curl -X POST https://api.brightdata.com/request \
+  -H "Authorization: Bearer $BRIGHTDATA_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"zone":"'"$BRIGHTDATA_ZONE"'","url":"https://docs.stripe.com/changelog","format":"raw"}'
+```
+
+`pipeline/src/clients/brightdata.ts` issues exactly that request.
+
+Extraction spec, mirrored from `skills/brightdata-changelog-scraper/SKILL.md` (change both
+in the same commit):
+
+```yaml
+vendors:
+  stripe:
+    url: https://docs.stripe.com/changelog
+    strategy: embedded-json       # Stripe ships entries as JSON, not markup — see below
+    json:
+      marker: "window.__INITIAL_STATE__ = "
+      entries_path: "article.content.children[].attributes.releaseTrains[].releases[].changelogEntries[]"
+      map:
+        date: "release"
+        title: "title[0]"
+        body: ["description", "impact", "changed", "affected"]
+        url: "https://docs.stripe.com/changelog/{train}#{slug}"
+        breaking: "breaking"
+    breaking_hint: ["deprecat", "removed", "breaking", "no longer"]
+```
+
+**Why `strategy: embedded-json`.** Stripe server-renders 880 changelog entries into
+`window.__INITIAL_STATE__`, and its CSS class names are build-hashed (`sn-1iugkao`), so
+selector-based extraction cannot reach the data and would break on every deploy. The JSON
+is also strictly better: Stripe publishes its own `breaking` boolean and the exact API
+symbols each entry changes, so we match on `PaymentIntent#create` rather than guessing from
+prose. `strategy: css` remains the default for vendors that render entries as HTML.
 
 Rules:
 - Every scrape writes raw HTML to `cache_dir` before parsing. Never parse without caching.
 - A scrape that returns 0 entries or fails schema validation is a **change event**, not an error. Trigger self-repair.
 - Self-repair edits the extraction spec, re-runs against cached HTML, and only then against live. It opens a PR for the spec change; it does not silently mutate config.
-- CLI invocation and flags: VERIFY against Bright Data getting-started doc and record the working command here:
-  `# TODO: paste working command, e.g. brightdata scrape --zone $ZONE --url <url> --schema schemas/changelog-entry.json`
+- The working CLI invocation is recorded above and implemented in
+  `pipeline/src/clients/brightdata.ts`.
 
 ## 7. Coding conventions
 

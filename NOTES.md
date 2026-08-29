@@ -82,3 +82,38 @@ tests here, because the tests were written by the same mind that wrote the bugs.
 Second lesson, cheaper: stacked PRs make review findings land on the wrong PR. Two of #3's
 findings were really about #1 and #2. Fixing them where the code lives — rather than where the
 review comment was — kept each PR coherent, at the cost of a rebase.
+
+## 2026-08-30 — The page we planned to scrape does not exist in the DOM
+
+**Where:** `skills/brightdata-changelog-scraper/SKILL.md`, `pipeline/src/lib/parse.ts`
+**Symptom:** The spec assumed `entry_selector` plus CSS field selectors. Fetching
+`https://docs.stripe.com/changelog` for real returned 3.1 MB containing exactly **one**
+`<article>` tag — and 312 distinct ISO dates. The deterministic repair engine, pointed at
+it, proposed nothing at all.
+**Cause:** Stripe server-renders the changelog into `window.__INITIAL_STATE__` as JSON and
+hydrates it. The rendered class names are build-hashed (`sn-1iugkao`, and some are literally
+`⚙`), so even where markup exists, a selector written today breaks on their next deploy.
+**Fix:** Added `strategy` to the extraction spec. `css` stays the default; `embedded-json`
+walks a dotted path into the page's own state blob. Stripe turned out to publish far better
+data than the DOM would have: 880 entries, each with its own `breaking` boolean and the exact
+API symbols it changes (`PaymentIntent#create`, `payment_method_types`). We match on those
+instead of guessing breakage from prose.
+**Lesson:** The most valuable thing in this build came from fetching the real page early
+instead of building against a fixture I had written myself. My hand-authored fixture was
+clean, well-structured, and nothing like the truth — and every heuristic I tuned against it
+scored zero on the real thing. A fixture you invented tests your assumptions, not the world.
+
+## 2026-08-30 — The blocked UI was never blocked
+
+**Where:** `ui/`, `docs/PLAN.md` §8 item 4
+**Symptom:** "Is `@truefoundry/trueforge-ui` embeddable standalone?" sat as the open question
+gating the whole UI track, and the cut order had a fallback ready for the answer being no.
+**Cause:** Nobody ran `npm view`. It is published — 0.2.4 — and it exports
+`useTrueFoundryRespondToToolApproval`, `ToolApprovalBar`, and `ApprovalDecision`: a
+ready-made approve/deny-with-reason control, which is exactly what `specs/ui.md` describes
+building by hand.
+**Fix:** Built the three panels. `src/adapter.ts` is the only file that talks to the harness,
+so pointing it at the real session and approval routes is a one-file change.
+**Lesson:** An unknown marked VERIFY still needs someone to spend the sixty seconds. This one
+had been carried as a risk through a plan, a cut order and two commits, and it cost one
+command to answer.
