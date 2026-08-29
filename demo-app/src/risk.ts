@@ -37,22 +37,36 @@ export function buildRiskPrompt(req: RiskRequest): string {
   ].join("\n");
 }
 
+type OpenAIResponseBody = {
+  output_text?: string;
+  output?: Array<{
+    content?: Array<{ text?: string }>;
+  }>;
+};
+
+function responseText(body: OpenAIResponseBody): string {
+  return (
+    body.output_text
+    ?? body.output?.flatMap((item) => item.content ?? []).map((content) => content.text ?? "").join("")
+    ?? ""
+  );
+}
+
 export function createOpenAI(apiKey = process.env.OPENAI_API_KEY ?? ""): OpenAIApi {
   return {
     async summariseRisk(req: RiskRequest): Promise<RiskAssessment> {
-      const res = await fetch(`${OPENAI_API}/chat/completions`, {
+      const res = await fetch(`${OPENAI_API}/responses`, {
         method: "POST",
         headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
         body: JSON.stringify({
           model: RISK_MODEL,
-          messages: [{ role: "user", content: buildRiskPrompt(req) }],
+          input: buildRiskPrompt(req),
         }),
       });
 
       if (!res.ok) throw new Error(`OpenAI risk check failed: ${res.status}`);
 
-      const body = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
-      const text = body.choices?.[0]?.message?.content ?? "";
+      const text = responseText((await res.json()) as OpenAIResponseBody);
       const level = /\b(high|medium|low)\b/i.exec(text)?.[1]?.toLowerCase() ?? "medium";
 
       return { level: level as RiskAssessment["level"], reason: text.trim() };
