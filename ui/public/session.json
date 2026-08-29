@@ -2,7 +2,7 @@
   "source": "local",
   "connected": false,
   "summary": {
-    "lastCheck": "2026-08-29T19:59:01.124Z",
+    "lastCheck": "2026-08-29T22:26:24.150Z",
     "eventsSeen": 4,
     "prsOpened": 1,
     "prsMerged": 0,
@@ -13,7 +13,7 @@
       "id": "s1",
       "kind": "skill",
       "label": "skill loaded",
-      "at": "2026-08-29T19:58:09.123Z",
+      "at": "2026-08-29T22:25:32.150Z",
       "status": "ok",
       "detail": "brightdata-changelog-scraper"
     },
@@ -21,7 +21,7 @@
       "id": "s2",
       "kind": "scrape",
       "label": "scrape stripe",
-      "at": "2026-08-29T19:58:13.123Z",
+      "at": "2026-08-29T22:25:36.150Z",
       "status": "ok",
       "detail": "40 entries · cache"
     },
@@ -29,7 +29,7 @@
       "id": "s3",
       "kind": "diff",
       "label": "diff: 4 changes",
-      "at": "2026-08-29T19:58:17.123Z",
+      "at": "2026-08-29T22:25:40.150Z",
       "status": "ok",
       "detail": "21 new since last run"
     },
@@ -37,14 +37,14 @@
       "id": "s4",
       "kind": "subagent",
       "label": "subagent: patcher",
-      "at": "2026-08-29T19:58:23.123Z",
+      "at": "2026-08-29T22:25:46.150Z",
       "status": "ok"
     },
     {
       "id": "s5",
       "kind": "sandbox",
       "label": "sandbox provisioned",
-      "at": "2026-08-29T19:58:25.123Z",
+      "at": "2026-08-29T22:25:48.150Z",
       "status": "ok",
       "detail": "patch + test run in isolation"
     },
@@ -52,7 +52,7 @@
       "id": "s6",
       "kind": "tests",
       "label": "tests: pass",
-      "at": "2026-08-29T19:58:49.123Z",
+      "at": "2026-08-29T22:26:12.150Z",
       "status": "ok",
       "detail": "14 passed"
     },
@@ -60,14 +60,14 @@
       "id": "s7",
       "kind": "pr",
       "label": "pr opened",
-      "at": "2026-08-29T19:58:55.123Z",
+      "at": "2026-08-29T22:26:18.150Z",
       "status": "ok"
     },
     {
       "id": "s8",
       "kind": "approval",
       "label": "waiting for approval to merge",
-      "at": "2026-08-29T19:58:57.123Z",
+      "at": "2026-08-29T22:26:20.150Z",
       "status": "warn"
     }
   ],
@@ -90,7 +90,7 @@
       "files": [
         "demo-app/src/payments.ts"
       ],
-      "diff": "--- a/demo-app/src/payments.ts\n+++ b/demo-app/src/payments.ts\n@@ -57,3 +57,3 @@\n-  const charge = await stripe.charges.create({\n+  const charge = await stripe.paymentIntents.create({\n     amount: req.amountCents,",
+      "diff": "--- a/demo-app/src/payments.ts\n+++ b/demo-app/src/payments.ts\n@@ -25,3 +25,3 @@\n-  status: PaymentIntent[\"status\"];\n+  status: PaymentIntent[\"<vendor-recommended replacement>\"];\n   amount: number;",
       "testsPassed": true,
       "testOutput": "Test Files 1 passed (1)\n     Tests 14 passed (14)",
       "prUrl": "https://github.com/Kush614/upstream-watch/pull/4",

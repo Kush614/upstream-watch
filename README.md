@@ -138,9 +138,18 @@ hit are in [`CLAUDE.md`](CLAUDE.md) §9.
 
 ## Qodo Code Review Evidence
 
-- **Representative PR:** [#2 — feat(pipeline): scrape, parse, diff, relevance, and self-repair](https://github.com/Kush614/upstream-watch/pull/2)
-- **What Qodo found / what changed or was dismissed:** 14 findings across [#1](https://github.com/Kush614/upstream-watch/pull/1)–[#3](https://github.com/Kush614/upstream-watch/pull/3), **0 dismissed as invalid**. The one worth reading: this project states in three files that changelog text is untrusted, and `buildPr` quoted the changelog *body* while interpolating the vendor-controlled *title* straight into a Markdown heading — so a title containing newlines could forge sections in a PR a human was about to approve. Also caught partial schema failures silently dropping entries, a corrupt state file being treated as a cold start, and `provenance` defaulting to `fixture` so a live run could publish a PR claiming cached data. All fixed with regression tests.
-- **Review history:** each PR carries a finding-by-finding disposition comment and a follow-up Qodo review ([#1](https://github.com/Kush614/upstream-watch/pull/1), [#2](https://github.com/Kush614/upstream-watch/pull/2), [#3](https://github.com/Kush614/upstream-watch/pull/3)). Follow-up counts went 2→1 (the remaining one a false positive, dismissed with evidence), 7→0, 5→0.
+Every change reaches `main` through a pull request reviewed by Qodo. Direct pushes to `main`
+are a non-negotiable in [`CLAUDE.md`](CLAUDE.md) §2.
+
+- **Representative merged PR:** [#8 — pipeline, agent, live Bright Data, four vendors, and the UI](https://github.com/Kush614/upstream-watch/pull/8), merged after a final **Bugs (0)** review.
+- **What Qodo found / what changed:** **27 findings across five PRs, none dismissed as invalid** (one dismissed as a false positive, with three independent proofs). The two that mattered most on #8 were showstoppers I would not have found otherwise: the UI passed `{event: …}` envelopes straight to its mappers, so it **rendered nothing at all** against a live session, and it matched the wrong approval event type, so a pending merge could never appear. Earlier rounds caught a vendor-controlled changelog title interpolated into a Markdown heading in a PR a human was about to approve, a last-good regression check that compared a candidate against its own output so it could never fail, `git add -A` sweeping unrelated working-tree changes into an agent-authored PR, and API keys written to predictable `/tmp` paths.
+- **Review history:** [#1](https://github.com/Kush614/upstream-watch/pull/1) · [#2](https://github.com/Kush614/upstream-watch/pull/2) · [#3](https://github.com/Kush614/upstream-watch/pull/3) · [#4](https://github.com/Kush614/upstream-watch/pull/4) · [#8](https://github.com/Kush614/upstream-watch/pull/8) — each carries a finding-by-finding disposition comment and a follow-up review.
+
+One pattern is worth naming, because Qodo caught it three separate times in three different
+files: **treating an absent result as good news.** `passed !== false`, `testsPassed ? true :
+null`, `args.testsPassed !== "false"` — each rendered "tests pass" directly above the merge
+button on the strength of a field that simply was not there. All three now return `null`, and
+the card says "unknown".
 
 Agent-generated PRs — patches and scraper repairs — go through the same flow. That is the
 point: the agent's code is held to the bar the humans' code is held to.

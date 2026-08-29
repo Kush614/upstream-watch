@@ -20,7 +20,8 @@
     "typecheck": "pnpm -r typecheck",
     "demo:rewind": "node --env-file-if-exists=.env --experimental-strip-types scripts/rewind-state.ts",
     "demo:feed": "node --env-file-if-exists=.env --experimental-strip-types scripts/build-feed.ts",
-    "ui": "pnpm --filter ui dev"
+    "ui": "pnpm --filter ui dev",
+    "demo:seed": "node --env-file-if-exists=.env --experimental-strip-types scripts/seed.ts"
   },
   "devDependencies": {
     "typescript": "^5.6.0",

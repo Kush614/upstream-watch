@@ -1,7 +1,9 @@
 {
   "vendor": "slack",
-  "lastCheck": "2026-08-29T21:51:14.466Z",
+  "lastCheck": "2026-08-29T22:25:25.437Z",
   "seen": [
+    "2026-08-20::The next wave of Agent messaging experience",
+    "2026-08-20::Announcing Slack Code",
     "2026-07-31::Announcing the Slack MCP and Skills Plugin",
     "2026-07-30::Release: Slack CLI v4.6.0",
     "2026-07-21::Release: Slack CLI v4.5.0",
@@ -220,8 +222,6 @@
     "2016-05-17::Changes to errors for incoming webhooks",
     "2016-04-26::RTM API file events payload change",
     "2016-04-14::Reminders API methods",
-    "2015-12-31::2015 shortform changelog entries",
-    "2026-08-20::The next wave of Agent messaging experience",
-    "2026-08-20::Announcing Slack Code"
+    "2015-12-31::2015 shortform changelog entries"
   ]
 }
