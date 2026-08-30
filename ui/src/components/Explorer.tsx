@@ -131,10 +131,13 @@ export function Explorer({
   vendors,
   packages,
   proofs,
+  problem,
 }: {
   vendors: VendorRow[];
   packages: PackageFinding[];
   proofs: OssProof[];
+  /** Why the tree is short, when it is. Never rendered as an empty tree. */
+  problem?: string;
 }) {
   const tree = useMemo(() => buildTree(vendors, packages, proofs), [vendors, packages, proofs]);
   const [selected, setSelected] = useState("");
@@ -149,9 +152,15 @@ export function Explorer({
 
       <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
         <div className="max-h-[26rem] overflow-y-auto rounded-lg border border-line bg-bg p-1.5">
-          {tree.map((n) => (
-            <Row key={n.id} node={n} depth={0} selected={selected} onSelect={setSelected} />
-          ))}
+          {problem ? (
+            // An empty tree reads as "nothing upstream can hurt you", which is the single
+            // most reassuring thing this page could say and the least likely to be true.
+            <p className="p-3 text-[13px] text-bad" role="alert">
+              Could not read the watchlist — {problem}. This is not an empty watchlist.
+            </p>
+          ) : (
+            tree.map((n) => <Row key={n.id} node={n} depth={0} selected={selected} onSelect={setSelected} />)
+          )}
         </div>
 
         <div className="max-h-[26rem] overflow-y-auto rounded-lg border border-line bg-bg p-3.5">

@@ -65,11 +65,11 @@ function vendorNode(v: VendorRow): Node {
  * The fourth source, and the only one that is not a reading of someone else's words:
  * both versions installed and run.
  */
-function proofNode(proof: OssProof): Node {
+function proofNode(proof: OssProof, parentId: string): Node {
   const broke = proof.before.healthy && !proof.after.healthy;
 
   return {
-    id: `pkg:${proof.package}:proof`,
+    id: `${parentId}:proof`,
     label: "run on both versions",
     badge: broke ? "breaks" : proof.after.healthy ? "still works" : "check",
     tone: broke ? "bad" : proof.after.healthy ? "ok" : "warn",
@@ -89,6 +89,10 @@ function proofNode(proof: OssProof): Node {
 }
 
 function packageNode(p: PackageFinding, proof?: OssProof): Node {
+  // Role belongs in the id: the same package appears twice — once as a real dependency of
+  // this repo and once as a labelled reference break — and a shared id makes the tree
+  // silently render one of them twice.
+  const id = `pkg:${p.role}:${p.package}`;
   const code = p.inSource.filter((h) => h.kind === "code");
   const behind = p.majorsBehind === 0;
 
@@ -97,7 +101,7 @@ function packageNode(p: PackageFinding, proof?: OssProof): Node {
 
   const children: Node[] = [
     {
-      id: `pkg:${p.package}:registry`,
+      id: `${id}:registry`,
       label: "registry",
       badge: `${p.pinned} → ${p.latest}`,
       tone: behind ? "ok" : "warn",
@@ -115,7 +119,7 @@ function packageNode(p: PackageFinding, proof?: OssProof): Node {
       },
     },
     {
-      id: `pkg:${p.package}:releases`,
+      id: `${id}:releases`,
       label: "release notes",
       badge: p.announced.length > 0 ? plural(p.announced.length, "mention") : "silent",
       tone: p.announced.length > 0 ? "warn" : "dim",
@@ -129,7 +133,7 @@ function packageNode(p: PackageFinding, proof?: OssProof): Node {
       },
     },
     {
-      id: `pkg:${p.package}:source`,
+      id: `${id}:source`,
       label: "the code itself",
       badge: code.length > 0 ? plural(code.length, "change") : "none found",
       tone: code.length > 0 ? "bad" : "dim",
@@ -147,24 +151,31 @@ function packageNode(p: PackageFinding, proof?: OssProof): Node {
     },
   ];
 
-  if (proof) children.push(proofNode(proof));
+  if (proof) children.push(proofNode(proof, id));
 
   return {
-    id: `pkg:${p.package}`,
+    id,
     label: p.package,
     badge: behind ? "current" : p.severity === "silent" ? "silent break" : `${plural(p.majorsBehind, "major")} behind`,
     tone,
     children,
     detail: {
       title: `${p.package} — ${p.repo}`,
-      summary: behind
+      summary: p.role === "reference"
+        ? (p.note ?? "A known break kept for demonstration. It is not a claim about this repo.")
+        : behind
         ? "On the current major."
         : p.severity === "silent"
           ? "This break does not throw. The old call still works and now means something else, so nothing fails until a user notices."
           : "A breaking change is available above your version.",
       facts: [
         { label: "repository", value: `https://github.com/${p.repo}`, url: `https://github.com/${p.repo}` },
-        { label: "you call", value: p.symbols?.join(", ") ?? "", mono: true },
+        { label: p.role === "reference" ? "the symbol that changed" : "you call", value: p.symbols?.join(", ") ?? "", mono: true },
+        // A symbol nobody calls cannot break you, and reporting it as though it could is
+        // the same fabrication as an invented version.
+        ...(p.unusedSymbols?.length
+          ? [{ label: "declared but not found in your files", value: p.unusedSymbols.join(", "), mono: true }]
+          : []),
       ].filter((f) => f.value),
       yours: p.files,
     },
@@ -174,7 +185,10 @@ function packageNode(p: PackageFinding, proof?: OssProof): Node {
 /** The whole tree. Groups exist so the reader sees the asymmetry immediately. */
 export function buildTree(vendors: VendorRow[], packages: PackageFinding[], proofs: OssProof[] = []): Node[] {
   const proofOf = new Map(proofs.map((p) => [p.package, p]));
-  return [
+  const mine = packages.filter((p) => p.role === "dependency");
+  const refs = packages.filter((p) => p.role === "reference");
+
+  const groups: Node[] = [
     {
       id: "group:apis",
       label: "Hosted APIs",
@@ -184,12 +198,29 @@ export function buildTree(vendors: VendorRow[], packages: PackageFinding[], proo
     },
     {
       id: "group:deps",
-      label: "Dependencies",
-      badge: `${packages.length} watched · ${proofs.length > 0 ? "3 sources + run on both" : "3 sources each"}`,
+      label: "Your dependencies",
+      badge: `${mine.length} watched · versions read from your manifests`,
       tone: "dim",
-      children: packages.map((p) => packageNode(p, proofOf.get(p.package))),
+      // Only a real dependency gets a proof node: running two majors of something this repo
+      // does not install would prove nothing about this repo.
+      children: mine.map((p) => packageNode(p, proofOf.get(p.package))),
     },
   ];
+
+  // Kept separate and named plainly. Folding these in with real dependencies is how a
+  // demonstration turns into a false claim about your codebase — which is what this file
+  // used to do for express, react-dom and eslint alike.
+  if (refs.length > 0) {
+    groups.push({
+      id: "group:refs",
+      label: "Reference breaks",
+      badge: "not your code — shown because they are reproducible",
+      tone: "dim",
+      children: refs.map((p) => packageNode(p, proofOf.get(p.package))),
+    });
+  }
+
+  return groups;
 }
 
 /** Depth-first lookup, so a selected id survives a refresh of the data behind it. */

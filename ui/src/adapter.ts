@@ -73,6 +73,12 @@ export interface Citation {
  */
 export interface PackageFinding {
   package: string;
+  /** A finding about this repo, or a demonstration that explicitly is not one. */
+  role: "dependency" | "reference";
+  /** Why a reference is shown, and that it does not apply here. */
+  note?: string;
+  /** Declared symbols found in none of the watched files. */
+  unusedSymbols?: string[];
   repo: string;
   pinned: string;
   latest: string;
@@ -87,6 +93,10 @@ export interface PackageFinding {
   compareUrl?: string;
   commits?: number;
   filesChanged?: number;
+  /** True when GitHub capped the file list — "nothing found" then means "not fully looked". */
+  truncated?: boolean;
+  /** Set when the pin could not be parsed; never rendered as "up to date". */
+  unparseablePin?: string;
   files: string[];
   symbols?: string[];
 }

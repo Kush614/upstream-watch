@@ -191,39 +191,43 @@ describe("what the review caught on the watchlist", () => {
 });
 
 describe("the upstream explorer", () => {
-  it("puts hosted APIs and dependencies in one tree, and shows the asymmetry", async () => {
+  it("keeps real dependencies apart from reference demonstrations", async () => {
     const { buildTree } = await import("../src/lib/tree.ts");
     const a = new MockAdapter();
-    const tree = buildTree(await a.listVendors(), await a.listPackages());
+    const tree = buildTree(await a.listVendors(), await a.listPackages(), await a.listOssProofs());
 
-    expect(tree.map((n) => n.label)).toEqual(["Hosted APIs", "Dependencies"]);
-    // The point of the grouping: a vendor gives you one source, a package gives you three.
-    expect(tree[0].badge).toMatch(/1 source each/);
-    expect(tree[1].badge).toMatch(/3 sources each/);
-    expect(tree[1].children?.[0].children?.map((c) => c.label)).toEqual([
-      "registry",
-      "release notes",
-      "the code itself",
-    ]);
+    expect(tree.map((n) => n.label)).toEqual(["Hosted APIs", "Your dependencies", "Reference breaks"]);
+    // Folding a demonstration in with real dependencies is how it becomes a false claim
+    // about your codebase — which is exactly what this file used to do.
+    expect(tree[2].badge).toMatch(/not your code/);
+    expect(tree[1].badge).toMatch(/read from your manifests/);
   });
 
-  it("marks a package worst when the code changed and the notes did not say so", async () => {
+  it("gives the same package two ids when it appears in both roles", async () => {
     const { buildTree, findNode } = await import("../src/lib/tree.ts");
     const a = new MockAdapter();
-    const tree = buildTree(await a.listVendors(), await a.listPackages());
+    const tree = buildTree(await a.listVendors(), await a.listPackages(), await a.listOssProofs());
 
-    // react-dom: a real capture with an announcement but no code hit on our symbols.
-    // Colouring that the same as an unannounced code change would bury the finding.
-    const react = findNode(tree, "pkg:react-dom");
-    const express = findNode(tree, "pkg:express");
-    expect(react?.tone).toBe("warn");
-    expect(express?.badge).toBe("silent break");
+    // express is both a real dependency (current) and a reference break (4 to 5). One id
+    // for both silently renders one of them twice.
+    expect(findNode(tree, "pkg:dependency:express")?.badge).toBe("current");
+    expect(findNode(tree, "pkg:reference:express")?.badge).toBe("silent break");
   });
+
 
   it("never says a dependency is fine just because the runner is unreachable", async () => {
     const { realAdapter } = await import("../src/adapter.real.ts");
     // An empty tree reads as "nothing to worry about" — the opposite of what a dead
     // runner actually tells you.
     await expect(realAdapter.listPackages()).rejects.toThrow();
+  });
+});
+
+describe("the explorer's empty state", () => {
+  it("does not let an unreachable runner render as an empty watchlist", async () => {
+    // An empty tree reads as "nothing upstream can hurt you" — the most reassuring thing
+    // the page could say, and the least likely to be true.
+    const { realAdapter } = await import("../src/adapter.real.ts");
+    await expect(realAdapter.listVendors()).rejects.toThrow();
   });
 });

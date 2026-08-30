@@ -27,6 +27,7 @@ export function App() {
   const [vendors, setVendors] = useState<VendorRow[]>([]);
   const [packages, setPackages] = useState<PackageFinding[]>([]);
   const [ossProofs, setOssProofs] = useState<OssProof[]>([]);
+  const [upstreamProblem, setUpstreamProblem] = useState<string>();
   const [sound, setSound] = useState(false);
   const play = useSound(sound);
   const lastPhase = useRef<Phase>("idle");
@@ -42,7 +43,7 @@ export function App() {
 
     // The watchlist is a separate claim with a separate failure mode: if the runner is
     // down, an empty table would read as "nothing is watched", so say why instead.
-    const surface = (e: unknown) => setError(e instanceof Error ? e.message : String(e));
+    const surface = (e: unknown) => setUpstreamProblem(e instanceof Error ? e.message : String(e));
     void adapter.listVendors().then(setVendors).catch(surface);
     void adapter.listPackages().then(setPackages).catch(surface);
     void adapter.listOssProofs().then(setOssProofs).catch(surface);
@@ -154,7 +155,7 @@ export function App() {
           <ProofColumn label="after" result={after} running={running} />
         </div>
 
-        <Explorer vendors={vendors} packages={packages} proofs={ossProofs} />
+        <Explorer vendors={vendors} packages={packages} proofs={ossProofs} problem={upstreamProblem} />
 
         <Watchlist rows={vendors} onCheck={(v) => adapter.checkVendor(v)} />
 

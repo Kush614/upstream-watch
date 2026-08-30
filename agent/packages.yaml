@@ -1,44 +1,79 @@
-# Open-source dependencies this repo watches.
+# Open-source upstreams, in two distinct roles.
 #
-# Distinct from agent/targets.yaml on purpose. A SaaS vendor can only be watched through
-# whatever it chooses to publish — a changelog page is the ONLY source, and if the page is
-# vague or the entry is missing, the watch is blind. A dependency is the opposite: the
-# changelog is the least authoritative source available, because the repository, the diff
-# between two releases, and both versions of the package itself are all readable.
+# The distinction is not cosmetic. This file previously claimed the repo was pinned to
+# express 4.19.2 (it is on ^5.2.1), that it called ReactDOM.render (it calls createRoot),
+# and that it depended on eslint (it does not). Every one of those produced a finding about
+# code that does not exist — the exact failure this project claims to prevent.
 #
-# So each package here is watched from three places at once:
-#   registry  — which versions exist, when they shipped, how stale you are
-#   releases  — what the maintainers said about it
-#   compare   — what actually changed in the source, which is the part nobody announces
+#   role: dependency  — a package this repo really installs. The version is NOT written
+#                       here; it is read from the workspace manifest, because a hand-written
+#                       version is a claim that drifts silently. Symbols are verified to
+#                       appear in `files` before any finding is reported.
 #
-# And unlike a vendor API, the break can be PROVED locally: install both majors, run the
-# same test against each, and show the difference. No key, no rate limit, no network at
-# demo time once the versions are cached.
+#   role: reference   — a known historical break, kept because it is worth showing and
+#                       reproducible by anyone. It is NOT a claim about this repo, and the
+#                       UI labels it that way.
 
 packages:
-  express:
-    repo: expressjs/express
-    package: express
-    # The major demo-app's server was written against. See §premise in docs/DEMO.md.
-    pinned: "4.19.2"
-    # What demo-app actually calls. Substring-matched against release notes and the diff.
-    symbols: [res.send, app.del, req.param, path-to-regexp]
-    files: [demo-app/src/payments.ts]
-    # Why this one leads the demo: it does not throw.
-    severity: silent
-
-  react:
+  react-dom:
+    role: dependency
     repo: facebook/react
     package: react-dom
-    pinned: "18.3.1"
-    symbols: [ReactDOM.render, defaultProps, string refs, unmountComponentAtNode]
+    # Read from ui/package.json at check time.
+    manifest: ui/package.json
+    # What ui/src/main.tsx actually calls. Verified by reading the file, not asserted here.
+    symbols: [createRoot, "react-dom/client"]
     files: [ui/src/main.tsx]
     severity: loud
 
-  eslint:
+  express:
+    role: dependency
+    repo: expressjs/express
+    package: express
+    manifest: demo-app/package.json
+    symbols: [express.json, app.get, app.post, app.use]
+    files: [demo-app/src/payments.ts]
+    severity: loud
+
+  express-4-to-5:
+    role: reference
+    repo: expressjs/express
+    package: express
+    # A reference break states its own versions: there is no manifest to read them from.
+    pinned: "4.19.2"
+    against: "5.2.1"
+    symbols: [res.send]
+    files: []
+    severity: silent
+    note: >-
+      res.send(status) was removed. The same line that replied 404 now replies 200 with the
+      body "404" — nothing throws, so CI stays green and uptime monitoring reports healthy.
+      This repo is already on express 5 and is not affected; it is here because it is the
+      clearest example of a break that a changelog date would never have warned you about.
+
+  react-18-to-19:
+    role: reference
+    repo: facebook/react
+    package: react-dom
+    pinned: "18.3.1"
+    against: "19.2.8"
+    symbols: [ReactDOM.render]
+    files: []
+    severity: loud
+    note: >-
+      ReactDOM.render was removed outright. This repo mounts with createRoot and is not
+      affected.
+
+  eslint-8-to-9:
+    role: reference
     repo: eslint/eslint
     package: eslint
     pinned: "8.57.0"
-    symbols: [.eslintrc, eslintrc, CLIEngine, --ext]
-    files: [.eslintrc.json]
+    against: "10.9.1"
+    symbols: [".eslintrc"]
+    files: []
     severity: loud
+    note: >-
+      Flat config became the only format. A repo with .eslintrc and no eslint.config.js does
+      not lint with different rules — it does not lint at all. This repo has neither file and
+      does not depend on eslint.

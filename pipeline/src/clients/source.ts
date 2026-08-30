@@ -47,6 +47,26 @@ export interface SourceDiff {
   url: string;
 }
 
+/**
+ * Does this line mention the symbol itself, rather than something that merely starts with it?
+ *
+ * A plain `includes("res.send")` matches `res.sendFile`, and did: an express 5.1.0 note about
+ * "ETag option in res.sendFile" was counted as evidence about `res.send`. The symbol must not
+ * be followed by another identifier character.
+ */
+export function mentions(line: string, symbol: string): boolean {
+  let from = 0;
+  for (;;) {
+    const at = line.indexOf(symbol, from);
+    if (at < 0) return false;
+
+    const next = line[at + symbol.length];
+    // Identifier continuation means this is a longer name, not our symbol.
+    if (next === undefined || !/[A-Za-z0-9_$]/.test(next)) return true;
+    from = at + 1;
+  }
+}
+
 /** Prose or code. Markdown, changelogs and docs directories are prose. */
 function kindOf(path: string): "code" | "docs" {
   return /\.(md|mdx|txt)$|^docs?\//i.test(path) ? "docs" : "code";
@@ -138,7 +158,7 @@ export async function compare(
     for (const symbol of symbols) {
       const lines = (file.patch ?? "")
         .split("\n")
-        .filter((l) => (l.startsWith("+") || l.startsWith("-")) && l.includes(symbol))
+        .filter((l) => (l.startsWith("+") || l.startsWith("-")) && mentions(l, symbol))
         .slice(0, 4);
 
       if (lines.length > 0) hits.push({ file: file.filename, symbol, lines, kind: kindOf(file.filename) });

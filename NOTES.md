@@ -637,3 +637,82 @@ it was not is eslint refusing to run at all.
 **`--slurp` cannot be combined with `--jq`** in `gh api`. This one failed loudly and reached
 the UI as `/packages -> 500`, which is the good version of this story: it broke visibly
 instead of returning a short list that looked like a complete one.
+
+## 2026-08-30 01:03 - proof runner /packages failed: reading releases for eslint/eslint failed: Get "https://api.
+
+**Where:** scripts/proof-runner.ts
+**Symptom:** reading releases for eslint/eslint failed: Get "https://api.github.com/repositories/11061773/releases?per_page=100&page=2": read tcp 172.30.30.148:61783->172.182.252.137:443: read: connection reset by peer
+**Cause:** _TBD_
+**Fix:** _TBD_
+**Lesson:** _TBD_
+
+## 2026-08-30 01:30 - proof runner /packages failed: packages.yaml: "react-dom.pinned" must be a non-empty string
+
+**Where:** scripts/proof-runner.ts
+**Symptom:** packages.yaml: "react-dom.pinned" must be a non-empty string
+**Cause:** _TBD_
+**Fix:** _TBD_
+**Lesson:** _TBD_
+
+## 2026-08-30 01:32 - proof runner /packages failed: packages.yaml: "react-dom.pinned" must be a non-empty string
+
+**Where:** scripts/proof-runner.ts
+**Symptom:** packages.yaml: "react-dom.pinned" must be a non-empty string
+**Cause:** _TBD_
+**Fix:** _TBD_
+**Lesson:** _TBD_
+
+## 2026-08-30 01:33 - proof runner /packages failed: packages.yaml: "react-dom.pinned" must be a non-empty string
+
+**Where:** scripts/proof-runner.ts
+**Symptom:** packages.yaml: "react-dom.pinned" must be a non-empty string
+**Cause:** _TBD_
+**Fix:** _TBD_
+**Lesson:** _TBD_
+
+## 2026-08-30 01:33 - proof runner /packages failed: packages.yaml: "react-dom.pinned" must be a non-empty string
+
+**Where:** scripts/proof-runner.ts
+**Symptom:** packages.yaml: "react-dom.pinned" must be a non-empty string
+**Cause:** _TBD_
+**Fix:** _TBD_
+**Lesson:** _TBD_
+
+## 2026-08-30 — The watcher was inventing findings about our own code
+
+The sharpest review this project has had. `agent/packages.yaml` asserted, by hand, that this
+repo pinned `express` at `4.19.2`, called `ReactDOM.render`, and depended on `eslint`.
+
+None of it was true. `demo-app` depends on `express@^5.2.1`. `ui/src/main.tsx` mounts with
+`createRoot`. There is no eslint in any manifest and no config file in the tree. Every
+finding produced from those lines was a finding about code that does not exist — which is
+precisely the failure this project exists to prevent, committed by the project itself.
+
+The cause was structural, not careless: a hand-written `pinned:` field is a claim that
+drifts the moment anyone runs an upgrade, and a hand-written `symbols:` list is a claim that
+was never checked against the source at all.
+
+**What changed.** Two roles, and the separation is load-bearing:
+
+- `role: dependency` — the version is **read from the workspace manifest**, never written
+  down. Symbols are checked against the files that claim to use them, and any that appear in
+  none of them are reported as "declared but not found" rather than silently watched.
+  Declaring a dependency the manifest does not list now throws.
+- `role: reference` — a known historical break, kept because it is genuinely reproducible,
+  labelled `[reference — not this repo]` in the CLI and grouped separately in the UI.
+
+**And the results changed with it.** express is now correctly reported as *up to date*, and
+`react-dom` surfaced as a real finding: `ui` is on 18.3.1 while 19.2.8 is current.
+
+**A related false positive, same review.** Symbol matching was `String.includes`, so
+`res.send` matched `res.sendFile` — an express 5.1.0 note about "ETag option in
+res.sendFile" was being counted as an announcement about `res.send`. With that fixed,
+express's announced-mentions went 2 → 0, which means the release notes never mentioned the
+change at all, and the "the source changes something you use and the release notes do not
+mention it" warning fires correctly for the first time.
+
+**Lesson.** The recurring bug in this project is an absent thing rendered as a present one.
+This is its sharpest form: not an absent *result* dressed as a good one, but an absent
+*dependency* dressed as a real one. Configuration that asserts facts about the codebase has
+to be derived from the codebase, or verified against it, or it is just a wish with a colon
+after it.

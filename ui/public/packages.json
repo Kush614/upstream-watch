@@ -1,5 +1,697 @@
 [
   {
+    "at": "2026-08-30T01:31:10.922Z",
+    "findings": [
+      {
+        "package": "react-dom",
+        "role": "dependency",
+        "repo": "facebook/react",
+        "pinned": "18.3.1",
+        "latest": "19.2.8",
+        "majorsBehind": 1,
+        "daysSincePinned": 855,
+        "breakAvailableSince": "2024-12-05T18:10:30.516Z",
+        "severity": "loud",
+        "announced": [
+          {
+            "tag": "v19.0.0",
+            "url": "https://github.com/react/react/releases/tag/v19.0.0",
+            "quote": "* Errors in render are not re-thrown: Errors that are not caught by an Error Boundary are now reported to window.reportError. Errors that are caught by an Error Boundary are reported to console.error."
+          }
+        ],
+        "inSource": [
+          {
+            "file": "CHANGELOG.md",
+            "symbol": "createRoot",
+            "lines": [
+              "+* Errors in render are not re-thrown: Errors that are not caught by an Error Boundary are now reported to window.reportError. Errors that are caught by an Error Boundary are reported to console.error. We’ve introduced `onUncaughtError` and `onCaughtError` methods to `createRoot` and `hydrateRoot` to customize this error handling.  ",
+              "+* Removed: `ReactDOM`.`render`, `ReactDOM`.`hydrate`: These have been removed in favor of the concurrent equivalents: `ReactDOM`.`createRoot` and `ReactDOM.hydrateRoot`.  ",
+              "+* Remove `render`, `hydrate`, `findDOMNode`, `unmountComponentAtNode`, `unstable_createEventHandle`, `unstable_renderSubtreeIntoContainer`, and `unstable_runWithPriority`. Move `createRoot` and `hydrateRoot` to `react-dom/client`. ([\\#28271](https://github.com/facebook/react/pull/28271) by [@gnoff](https://github.com/gnoff))  "
+            ],
+            "kind": "docs"
+          },
+          {
+            "file": "CHANGELOG.md",
+            "symbol": "react-dom/client",
+            "lines": [
+              "+* Remove `render`, `hydrate`, `findDOMNode`, `unmountComponentAtNode`, `unstable_createEventHandle`, `unstable_renderSubtreeIntoContainer`, and `unstable_runWithPriority`. Move `createRoot` and `hydrateRoot` to `react-dom/client`. ([\\#28271](https://github.com/facebook/react/pull/28271) by [@gnoff](https://github.com/gnoff))  "
+            ],
+            "kind": "docs"
+          }
+        ],
+        "files": [
+          "ui/src/main.tsx"
+        ],
+        "compareUrl": "https://github.com/react/react/compare/v18.3.1...v19.2.8",
+        "commits": 5979,
+        "filesChanged": 300,
+        "truncated": true
+      },
+      {
+        "package": "express",
+        "role": "dependency",
+        "repo": "expressjs/express",
+        "pinned": "5.2.1",
+        "latest": "5.2.1",
+        "majorsBehind": 0,
+        "daysSincePinned": 271,
+        "breakAvailableSince": null,
+        "severity": "loud",
+        "announced": [],
+        "inSource": [],
+        "files": [
+          "demo-app/src/payments.ts"
+        ]
+      },
+      {
+        "package": "express",
+        "role": "reference",
+        "note": "res.send(status) was removed. The same line that replied 404 now replies 200 with the body \"404\" — nothing throws, so CI stays green and uptime monitoring reports healthy. This repo is already on express 5 and is not affected; it is here because it is the clearest example of a break that a changelog date would never have warned you about.",
+        "repo": "expressjs/express",
+        "pinned": "4.19.2",
+        "latest": "5.2.1",
+        "majorsBehind": 1,
+        "daysSincePinned": 887,
+        "breakAvailableSince": "2024-09-10T04:40:34.348Z",
+        "severity": "silent",
+        "announced": [],
+        "inSource": [
+          {
+            "file": "examples/search/index.js",
+            "symbol": "res.send",
+            "lines": [
+              "-    if (err) return res.send(500);"
+            ],
+            "kind": "code"
+          },
+          {
+            "file": "lib/response.js",
+            "symbol": "res.send",
+            "lines": [
+              "-    // res.send(body, status) backwards compat",
+              "-      deprecate('res.send(body, status): Use res.status(status).send(body) instead');",
+              "-      deprecate('res.send(status, body): Use res.status(status).send(body) instead');",
+              "-  // disambiguate res.send(status) and res.send(status, num)"
+            ],
+            "kind": "code"
+          },
+          {
+            "file": "lib/router/index.js",
+            "symbol": "res.send",
+            "lines": [
+              "-    res.send(body);"
+            ],
+            "kind": "code"
+          },
+          {
+            "file": "lib/router/route.js",
+            "symbol": "res.send",
+            "lines": [
+              "- *     res.send('hello world');"
+            ],
+            "kind": "code"
+          },
+          {
+            "file": "test/app.param.js",
+            "symbol": "res.send",
+            "lines": [
+              "-        res.send(req.params.name);"
+            ],
+            "kind": "code"
+          },
+          {
+            "file": "test/app.route.js",
+            "symbol": "res.send",
+            "lines": [
+              "+        res.send('hello, world!')",
+              "+        res.send('caught: ' + err.message)",
+              "+        res.send('hello, world!')",
+              "+        res.send('caught: ' + err.message)"
+            ],
+            "kind": "code"
+          },
+          {
+            "file": "test/app.router.js",
+            "symbol": "res.send",
+            "lines": [
+              "-        res.send(keys.map(function(k){ return [k, req.params[k]] }));",
+              "+        res.send(keys.map(function (k) { return [k, req.params[k]] }));",
+              "-        res.send(keys.map(function(k){ return [k, req.params[k]] }));",
+              "+        res.send(keys.map(function (k) { return [k, req.params[k]] }));"
+            ],
+            "kind": "code"
+          },
+          {
+            "file": "test/app.routes.error.js",
+            "symbol": "res.send",
+            "lines": [
+              "-        res.send(204);"
+            ],
+            "kind": "code"
+          },
+          {
+            "file": "test/express.json.js",
+            "symbol": "res.send",
+            "lines": [
+              "-      res.send('[' + err.type + '] ' + err.message)"
+            ],
+            "kind": "code"
+          },
+          {
+            "file": "test/express.raw.js",
+            "symbol": "res.send",
+            "lines": [
+              "-      res.send('[' + err.type + '] ' + err.message)"
+            ],
+            "kind": "code"
+          },
+          {
+            "file": "test/express.text.js",
+            "symbol": "res.send",
+            "lines": [
+              "-      res.send('[' + err.type + '] ' + err.message)"
+            ],
+            "kind": "code"
+          },
+          {
+            "file": "test/express.urlencoded.js",
+            "symbol": "res.send",
+            "lines": [
+              "-      res.send('[' + err.type + '] ' + err.message)"
+            ],
+            "kind": "code"
+          },
+          {
+            "file": "test/req.acceptsEncoding.js",
+            "symbol": "res.send",
+            "lines": [
+              "-        res.send({",
+              "-        res.send({"
+            ],
+            "kind": "code"
+          },
+          {
+            "file": "test/req.acceptsLanguage.js",
+            "symbol": "res.send",
+            "lines": [
+              "-        res.send({",
+              "-        res.send({",
+              "-          res.send({"
+            ],
+            "kind": "code"
+          },
+          {
+            "file": "test/req.fresh.js",
+            "symbol": "res.send",
+            "lines": [
+              "+        res.send(req.fresh);"
+            ],
+            "kind": "code"
+          },
+          {
+            "file": "test/req.query.js",
+            "symbol": "res.send",
+            "lines": [
+              "-          res.send(req.query);"
+            ],
+            "kind": "code"
+          },
+          {
+            "file": "test/res.format.js",
+            "symbol": "res.send",
+            "lines": [
+              "-  res.send(err.status, 'Supports: ' + err.types.join(', '));",
+              "+  res.send('Supports: ' + err.types.join(', '))",
+              "-  res.send(err.status, 'Supports: ' + err.types.join(', '));",
+              "+  res.send('Supports: ' + err.types.join(', '))"
+            ],
+            "kind": "code"
+          },
+          {
+            "file": "test/res.send.js",
+            "symbol": "res.send",
+            "lines": [
+              "-        res.send(201)",
+              "-        res.send(201, 'Created :)');",
+              "-        res.send('Bad!', 400);",
+              "-        res.send(200, 0.123);"
+            ],
+            "kind": "code"
+          },
+          {
+            "file": "test/res.sendFile.js",
+            "symbol": "res.send",
+            "lines": [
+              "-          res.send(err.message);",
+              "-          res.send(err.message);",
+              "-            res.send(err ? 'got ' + err.status + ' error' : 'no error')"
+            ],
+            "kind": "code"
+          },
+          {
+            "file": "History.md",
+            "symbol": "res.send",
+            "lines": [
+              "+* Add support for `Uint8Array` in `res.send()`",
+              "+    - `res.send(status, body)` signature - use `res.status(status).send(body)`",
+              "+    - `res.send(body, status)` signature - use `res.send(status, body)`",
+              "+    - `res.send(status)` signature - use `res.sendStatus(status)`"
+            ],
+            "kind": "docs"
+          }
+        ],
+        "files": [],
+        "compareUrl": "https://github.com/expressjs/express/compare/4.19.2...v5.2.1",
+        "commits": 292,
+        "filesChanged": 105,
+        "truncated": false
+      },
+      {
+        "package": "react-dom",
+        "role": "reference",
+        "note": "ReactDOM.render was removed outright. This repo mounts with createRoot and is not affected.",
+        "repo": "facebook/react",
+        "pinned": "18.3.1",
+        "latest": "19.2.8",
+        "majorsBehind": 1,
+        "daysSincePinned": 855,
+        "breakAvailableSince": "2024-12-05T18:10:30.516Z",
+        "severity": "loud",
+        "announced": [],
+        "inSource": [],
+        "files": [],
+        "compareUrl": "https://github.com/react/react/compare/v18.3.1...v19.2.8",
+        "commits": 5979,
+        "filesChanged": 300,
+        "truncated": true
+      },
+      {
+        "package": "eslint",
+        "role": "reference",
+        "note": "Flat config became the only format. A repo with .eslintrc and no eslint.config.js does not lint with different rules — it does not lint at all. This repo has neither file and does not depend on eslint.",
+        "repo": "eslint/eslint",
+        "pinned": "8.57.0",
+        "latest": "10.9.1",
+        "majorsBehind": 2,
+        "daysSincePinned": 918,
+        "breakAvailableSince": "2024-04-05T20:53:31.118Z",
+        "severity": "loud",
+        "announced": [
+          {
+            "tag": "v9.6.0",
+            "url": "https://github.com/eslint/eslint/releases/tag/v9.6.0",
+            "quote": "* [`3379164`](https://github.com/eslint/eslint/commit/3379164e8b0cee57caf7da34226982075ebef51a) chore: remove `.eslintrc.js` (#18011) (唯然)"
+          }
+        ],
+        "inSource": [
+          {
+            "file": ".eslintignore",
+            "symbol": ".eslintrc",
+            "lines": [
+              "-!.eslintrc.js"
+            ],
+            "kind": "code"
+          },
+          {
+            "file": "README.md",
+            "symbol": ".eslintrc",
+            "lines": [
+              "-After running `npm init @eslint/config`, you'll have an `.eslintrc` file in your directory. In it, you'll see some rules configured like this:"
+            ],
+            "kind": "docs"
+          },
+          {
+            "file": "docs/_examples/integration-tutorial-code/example-eslint-integration.js",
+            "symbol": ".eslintrc",
+            "lines": [
+              "-    // from a .eslintrc file or just use the default config."
+            ],
+            "kind": "docs"
+          },
+          {
+            "file": "docs/src/contribute/architecture/index.md",
+            "symbol": ".eslintrc",
+            "lines": [
+              "-* Reading configuration information from config files (including `.eslintrc` and `package.json`)"
+            ],
+            "kind": "docs"
+          }
+        ],
+        "files": [],
+        "compareUrl": "https://github.com/eslint/eslint/compare/v8.57.0...v10.9.1",
+        "commits": 1760,
+        "filesChanged": 300,
+        "truncated": true
+      }
+    ]
+  },
+  {
+    "at": "2026-08-30T01:30:10.295Z",
+    "findings": [
+      {
+        "package": "react-dom",
+        "role": "dependency",
+        "repo": "facebook/react",
+        "pinned": "18.3.1",
+        "latest": "19.2.8",
+        "majorsBehind": 1,
+        "daysSincePinned": 855,
+        "breakAvailableSince": "2024-12-05T18:10:30.516Z",
+        "severity": "loud",
+        "announced": [
+          {
+            "tag": "v19.0.0",
+            "url": "https://github.com/react/react/releases/tag/v19.0.0",
+            "quote": "* Errors in render are not re-thrown: Errors that are not caught by an Error Boundary are now reported to window.reportError. Errors that are caught by an Error Boundary are reported to console.error."
+          }
+        ],
+        "inSource": [
+          {
+            "file": "CHANGELOG.md",
+            "symbol": "createRoot",
+            "lines": [
+              "+* Errors in render are not re-thrown: Errors that are not caught by an Error Boundary are now reported to window.reportError. Errors that are caught by an Error Boundary are reported to console.error. We’ve introduced `onUncaughtError` and `onCaughtError` methods to `createRoot` and `hydrateRoot` to customize this error handling.  ",
+              "+* Removed: `ReactDOM`.`render`, `ReactDOM`.`hydrate`: These have been removed in favor of the concurrent equivalents: `ReactDOM`.`createRoot` and `ReactDOM.hydrateRoot`.  ",
+              "+* Remove `render`, `hydrate`, `findDOMNode`, `unmountComponentAtNode`, `unstable_createEventHandle`, `unstable_renderSubtreeIntoContainer`, and `unstable_runWithPriority`. Move `createRoot` and `hydrateRoot` to `react-dom/client`. ([\\#28271](https://github.com/facebook/react/pull/28271) by [@gnoff](https://github.com/gnoff))  "
+            ],
+            "kind": "docs"
+          },
+          {
+            "file": "CHANGELOG.md",
+            "symbol": "react-dom/client",
+            "lines": [
+              "+* Remove `render`, `hydrate`, `findDOMNode`, `unmountComponentAtNode`, `unstable_createEventHandle`, `unstable_renderSubtreeIntoContainer`, and `unstable_runWithPriority`. Move `createRoot` and `hydrateRoot` to `react-dom/client`. ([\\#28271](https://github.com/facebook/react/pull/28271) by [@gnoff](https://github.com/gnoff))  "
+            ],
+            "kind": "docs"
+          }
+        ],
+        "files": [
+          "ui/src/main.tsx"
+        ],
+        "compareUrl": "https://github.com/react/react/compare/v18.3.1...v19.2.8",
+        "commits": 5979,
+        "filesChanged": 300,
+        "truncated": true
+      },
+      {
+        "package": "express",
+        "role": "dependency",
+        "repo": "expressjs/express",
+        "pinned": "5.2.1",
+        "latest": "5.2.1",
+        "majorsBehind": 0,
+        "daysSincePinned": 271,
+        "breakAvailableSince": null,
+        "severity": "loud",
+        "announced": [],
+        "inSource": [],
+        "files": [
+          "demo-app/src/payments.ts"
+        ]
+      },
+      {
+        "package": "express",
+        "role": "reference",
+        "note": "res.send(status) was removed. The same line that replied 404 now replies 200 with the body \"404\" — nothing throws, so CI stays green and uptime monitoring reports healthy. This repo is already on express 5 and is not affected; it is here because it is the clearest example of a break that a changelog date would never have warned you about.",
+        "repo": "expressjs/express",
+        "pinned": "4.19.2",
+        "latest": "5.2.1",
+        "majorsBehind": 1,
+        "daysSincePinned": 887,
+        "breakAvailableSince": "2024-09-10T04:40:34.348Z",
+        "severity": "silent",
+        "announced": [],
+        "inSource": [
+          {
+            "file": "examples/search/index.js",
+            "symbol": "res.send",
+            "lines": [
+              "-    if (err) return res.send(500);"
+            ],
+            "kind": "code"
+          },
+          {
+            "file": "lib/response.js",
+            "symbol": "res.send",
+            "lines": [
+              "-    // res.send(body, status) backwards compat",
+              "-      deprecate('res.send(body, status): Use res.status(status).send(body) instead');",
+              "-      deprecate('res.send(status, body): Use res.status(status).send(body) instead');",
+              "-  // disambiguate res.send(status) and res.send(status, num)"
+            ],
+            "kind": "code"
+          },
+          {
+            "file": "lib/router/index.js",
+            "symbol": "res.send",
+            "lines": [
+              "-    res.send(body);"
+            ],
+            "kind": "code"
+          },
+          {
+            "file": "lib/router/route.js",
+            "symbol": "res.send",
+            "lines": [
+              "- *     res.send('hello world');"
+            ],
+            "kind": "code"
+          },
+          {
+            "file": "test/app.param.js",
+            "symbol": "res.send",
+            "lines": [
+              "-        res.send(req.params.name);"
+            ],
+            "kind": "code"
+          },
+          {
+            "file": "test/app.route.js",
+            "symbol": "res.send",
+            "lines": [
+              "+        res.send('hello, world!')",
+              "+        res.send('caught: ' + err.message)",
+              "+        res.send('hello, world!')",
+              "+        res.send('caught: ' + err.message)"
+            ],
+            "kind": "code"
+          },
+          {
+            "file": "test/app.router.js",
+            "symbol": "res.send",
+            "lines": [
+              "-        res.send(keys.map(function(k){ return [k, req.params[k]] }));",
+              "+        res.send(keys.map(function (k) { return [k, req.params[k]] }));",
+              "-        res.send(keys.map(function(k){ return [k, req.params[k]] }));",
+              "+        res.send(keys.map(function (k) { return [k, req.params[k]] }));"
+            ],
+            "kind": "code"
+          },
+          {
+            "file": "test/app.routes.error.js",
+            "symbol": "res.send",
+            "lines": [
+              "-        res.send(204);"
+            ],
+            "kind": "code"
+          },
+          {
+            "file": "test/express.json.js",
+            "symbol": "res.send",
+            "lines": [
+              "-      res.send('[' + err.type + '] ' + err.message)"
+            ],
+            "kind": "code"
+          },
+          {
+            "file": "test/express.raw.js",
+            "symbol": "res.send",
+            "lines": [
+              "-      res.send('[' + err.type + '] ' + err.message)"
+            ],
+            "kind": "code"
+          },
+          {
+            "file": "test/express.text.js",
+            "symbol": "res.send",
+            "lines": [
+              "-      res.send('[' + err.type + '] ' + err.message)"
+            ],
+            "kind": "code"
+          },
+          {
+            "file": "test/express.urlencoded.js",
+            "symbol": "res.send",
+            "lines": [
+              "-      res.send('[' + err.type + '] ' + err.message)"
+            ],
+            "kind": "code"
+          },
+          {
+            "file": "test/req.acceptsEncoding.js",
+            "symbol": "res.send",
+            "lines": [
+              "-        res.send({",
+              "-        res.send({"
+            ],
+            "kind": "code"
+          },
+          {
+            "file": "test/req.acceptsLanguage.js",
+            "symbol": "res.send",
+            "lines": [
+              "-        res.send({",
+              "-        res.send({",
+              "-          res.send({"
+            ],
+            "kind": "code"
+          },
+          {
+            "file": "test/req.fresh.js",
+            "symbol": "res.send",
+            "lines": [
+              "+        res.send(req.fresh);"
+            ],
+            "kind": "code"
+          },
+          {
+            "file": "test/req.query.js",
+            "symbol": "res.send",
+            "lines": [
+              "-          res.send(req.query);"
+            ],
+            "kind": "code"
+          },
+          {
+            "file": "test/res.format.js",
+            "symbol": "res.send",
+            "lines": [
+              "-  res.send(err.status, 'Supports: ' + err.types.join(', '));",
+              "+  res.send('Supports: ' + err.types.join(', '))",
+              "-  res.send(err.status, 'Supports: ' + err.types.join(', '));",
+              "+  res.send('Supports: ' + err.types.join(', '))"
+            ],
+            "kind": "code"
+          },
+          {
+            "file": "test/res.send.js",
+            "symbol": "res.send",
+            "lines": [
+              "-        res.send(201)",
+              "-        res.send(201, 'Created :)');",
+              "-        res.send('Bad!', 400);",
+              "-        res.send(200, 0.123);"
+            ],
+            "kind": "code"
+          },
+          {
+            "file": "test/res.sendFile.js",
+            "symbol": "res.send",
+            "lines": [
+              "-          res.send(err.message);",
+              "-          res.send(err.message);",
+              "-            res.send(err ? 'got ' + err.status + ' error' : 'no error')"
+            ],
+            "kind": "code"
+          },
+          {
+            "file": "History.md",
+            "symbol": "res.send",
+            "lines": [
+              "+* Add support for `Uint8Array` in `res.send()`",
+              "+    - `res.send(status, body)` signature - use `res.status(status).send(body)`",
+              "+    - `res.send(body, status)` signature - use `res.send(status, body)`",
+              "+    - `res.send(status)` signature - use `res.sendStatus(status)`"
+            ],
+            "kind": "docs"
+          }
+        ],
+        "files": [],
+        "compareUrl": "https://github.com/expressjs/express/compare/4.19.2...v5.2.1",
+        "commits": 292,
+        "filesChanged": 105,
+        "truncated": false
+      },
+      {
+        "package": "react-dom",
+        "role": "reference",
+        "note": "ReactDOM.render was removed outright. This repo mounts with createRoot and is not affected.",
+        "repo": "facebook/react",
+        "pinned": "18.3.1",
+        "latest": "19.2.8",
+        "majorsBehind": 1,
+        "daysSincePinned": 855,
+        "breakAvailableSince": "2024-12-05T18:10:30.516Z",
+        "severity": "loud",
+        "announced": [],
+        "inSource": [],
+        "files": [],
+        "compareUrl": "https://github.com/react/react/compare/v18.3.1...v19.2.8",
+        "commits": 5979,
+        "filesChanged": 300,
+        "truncated": true
+      },
+      {
+        "package": "eslint",
+        "role": "reference",
+        "note": "Flat config became the only format. A repo with .eslintrc and no eslint.config.js does not lint with different rules — it does not lint at all. This repo has neither file and does not depend on eslint.",
+        "repo": "eslint/eslint",
+        "pinned": "8.57.0",
+        "latest": "10.9.1",
+        "majorsBehind": 2,
+        "daysSincePinned": 918,
+        "breakAvailableSince": "2024-04-05T20:53:31.118Z",
+        "severity": "loud",
+        "announced": [
+          {
+            "tag": "v9.6.0",
+            "url": "https://github.com/eslint/eslint/releases/tag/v9.6.0",
+            "quote": "* [`3379164`](https://github.com/eslint/eslint/commit/3379164e8b0cee57caf7da34226982075ebef51a) chore: remove `.eslintrc.js` (#18011) (唯然)"
+          }
+        ],
+        "inSource": [
+          {
+            "file": ".eslintignore",
+            "symbol": ".eslintrc",
+            "lines": [
+              "-!.eslintrc.js"
+            ],
+            "kind": "code"
+          },
+          {
+            "file": "README.md",
+            "symbol": ".eslintrc",
+            "lines": [
+              "-After running `npm init @eslint/config`, you'll have an `.eslintrc` file in your directory. In it, you'll see some rules configured like this:"
+            ],
+            "kind": "docs"
+          },
+          {
+            "file": "docs/_examples/integration-tutorial-code/example-eslint-integration.js",
+            "symbol": ".eslintrc",
+            "lines": [
+              "-    // from a .eslintrc file or just use the default config."
+            ],
+            "kind": "docs"
+          },
+          {
+            "file": "docs/src/contribute/architecture/index.md",
+            "symbol": ".eslintrc",
+            "lines": [
+              "-* Reading configuration information from config files (including `.eslintrc` and `package.json`)"
+            ],
+            "kind": "docs"
+          }
+        ],
+        "files": [],
+        "compareUrl": "https://github.com/eslint/eslint/compare/v8.57.0...v10.9.1",
+        "commits": 1760,
+        "filesChanged": 300,
+        "truncated": true
+      }
+    ]
+  },
+  {
     "at": "2026-08-30T00:40:34.608Z",
     "findings": [
       {

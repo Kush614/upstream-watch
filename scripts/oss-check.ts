@@ -14,11 +14,18 @@ import { readFile, writeFile } from "node:fs/promises";
 import { versionsOf, staleness, majorOf } from "../pipeline/src/clients/registry.ts";
 import { fromRepoRoot } from "../pipeline/src/lib/paths.ts";
 import { loadPackages, type WatchedPackage } from "../pipeline/src/lib/packages.ts";
-import { releases, compare } from "../pipeline/src/clients/source.ts";
+import { releases, compare, mentions } from "../pipeline/src/clients/source.ts";
 import { ConfigError } from "../pipeline/src/errors.ts";
+import { appendNote } from "../pipeline/src/lib/notes.ts";
 
 export interface PackageFinding {
   package: string;
+  /** A finding about this repo, or a demonstration that explicitly is not. */
+  role: "dependency" | "reference";
+  /** Why a reference is shown, and that it does not apply here. */
+  note?: string;
+  /** Declared symbols that appear in none of the declared files. */
+  unusedSymbols?: string[];
   repo: string;
   pinned: string;
   latest: string;
@@ -43,13 +50,19 @@ export interface PackageFinding {
 
 export async function checkPackage(p: WatchedPackage): Promise<PackageFinding> {
   const versions = await versionsOf(p.package);
-  const stale = staleness(versions, p.pinned);
+  // A reference is compared against the version it names, not against latest: it documents
+  // one historical step, and re-pointing it at latest would change what it claims.
+  const target = p.role === "reference" ? (p.against ?? versions.latest) : versions.latest;
+  const stale = staleness({ ...versions, latest: target }, p.pinned);
 
   const finding: PackageFinding = {
     package: p.package,
+    role: p.role,
+    note: p.note,
+    unusedSymbols: p.unusedSymbols?.length ? p.unusedSymbols : undefined,
     repo: p.repo,
     pinned: p.pinned,
-    latest: versions.latest,
+    latest: target,
     majorsBehind: stale.majorsBehind,
     daysSincePinned: stale.daysSincePinned,
     breakAvailableSince: stale.nextMajor?.published ?? null,
@@ -70,7 +83,7 @@ export async function checkPackage(p: WatchedPackage): Promise<PackageFinding> {
     if (major === null || major <= (majorOf(p.pinned) ?? 0)) continue;
 
     for (const symbol of p.symbols) {
-      const line = note.body.split("\n").find((l) => l.includes(symbol));
+      const line = note.body.split("\n").find((l) => mentions(l, symbol));
       if (line) {
         finding.announced.push({ tag: note.tag, url: note.url, quote: line.trim().slice(0, 200) });
         break;
@@ -82,7 +95,7 @@ export async function checkPackage(p: WatchedPackage): Promise<PackageFinding> {
     // Compare through to LATEST, not merely to the next major. eslint is two majors behind:
     // stopping at 9.0.0 would examine none of the 10.x changes and then report what looks
     // like a complete answer.
-    const diff = await compare(p.repo, p.pinned, versions.latest, p.symbols, p.package);
+    const diff = await compare(p.repo, p.pinned, target, p.symbols, p.package);
     finding.inSource = diff.hits;
     finding.compareUrl = diff.url;
     finding.commits = diff.commits;
@@ -101,7 +114,13 @@ function render(f: PackageFinding): void {
   }
 
   const behind = f.majorsBehind === 0 ? "up to date" : `${f.majorsBehind} major${f.majorsBehind > 1 ? "s" : ""} behind`;
-  console.log(`\n  ${f.package}  ${f.pinned} → ${f.latest}   ${behind}`);
+  const tag = f.role === "reference" ? "  [reference — not this repo]" : "";
+  console.log(`\n  ${f.package}  ${f.pinned} → ${f.latest}   ${behind}${tag}`);
+
+  if (f.unusedSymbols?.length) {
+    // Watching a symbol nobody calls manufactures a finding about code that does not exist.
+    console.log(`    ⚠ declared but not found in the watched files: ${f.unusedSymbols.join(", ")}`);
+  }
   if (f.majorsBehind === 0) return;
 
   if (f.breakAvailableSince) {
@@ -192,8 +211,16 @@ async function main(): Promise<void> {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  main().catch((error: unknown) => {
-    console.error(error instanceof Error ? error.message : String(error));
+  main().catch(async (error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(message);
+    // Every top-level failure is written down (CLAUDE.md §2.5) — a watcher that dies
+    // quietly is indistinguishable from one that found nothing.
+    await appendNote({
+      summary: `oss:check failed: ${message.slice(0, 60)}`,
+      where: "scripts/oss-check.ts",
+      symptom: message,
+    }).catch(() => undefined);
     process.exitCode = 1;
   });
 }
