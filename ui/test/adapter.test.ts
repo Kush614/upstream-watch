@@ -189,3 +189,41 @@ describe("what the review caught on the watchlist", () => {
     await expect(new MockAdapter().checkVendor("netflix")).rejects.toBeInstanceOf(WatchlistError);
   });
 });
+
+describe("the upstream explorer", () => {
+  it("puts hosted APIs and dependencies in one tree, and shows the asymmetry", async () => {
+    const { buildTree } = await import("../src/lib/tree.ts");
+    const a = new MockAdapter();
+    const tree = buildTree(await a.listVendors(), await a.listPackages());
+
+    expect(tree.map((n) => n.label)).toEqual(["Hosted APIs", "Dependencies"]);
+    // The point of the grouping: a vendor gives you one source, a package gives you three.
+    expect(tree[0].badge).toMatch(/1 source each/);
+    expect(tree[1].badge).toMatch(/3 sources each/);
+    expect(tree[1].children?.[0].children?.map((c) => c.label)).toEqual([
+      "registry",
+      "release notes",
+      "the code itself",
+    ]);
+  });
+
+  it("marks a package worst when the code changed and the notes did not say so", async () => {
+    const { buildTree, findNode } = await import("../src/lib/tree.ts");
+    const a = new MockAdapter();
+    const tree = buildTree(await a.listVendors(), await a.listPackages());
+
+    // react-dom: a real capture with an announcement but no code hit on our symbols.
+    // Colouring that the same as an unannounced code change would bury the finding.
+    const react = findNode(tree, "pkg:react-dom");
+    const express = findNode(tree, "pkg:express");
+    expect(react?.tone).toBe("warn");
+    expect(express?.badge).toBe("silent break");
+  });
+
+  it("never says a dependency is fine just because the runner is unreachable", async () => {
+    const { realAdapter } = await import("../src/adapter.real.ts");
+    // An empty tree reads as "nothing to worry about" — the opposite of what a dead
+    // runner actually tells you.
+    await expect(realAdapter.listPackages()).rejects.toThrow();
+  });
+});

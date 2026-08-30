@@ -196,6 +196,165 @@ const VENDORS: VendorRow[] = [
   },
 ];
 
+/**
+ * The three watched dependencies, captured verbatim from a real `pnpm oss:check --json`.
+ *
+ * Trimmed to the evidence a reader actually reads — never edited. Hand-written numbers here
+ * would be the same fabrication the proof columns exist to refuse.
+ */
+const PACKAGES: PackageFinding[] = [
+    {
+      "package": "express",
+      "repo": "expressjs/express",
+      "pinned": "4.19.2",
+      "latest": "5.2.1",
+      "majorsBehind": 1,
+      "daysSincePinned": 887,
+      "breakAvailableSince": "2024-09-10T04:40:34.348Z",
+      "severity": "silent",
+      "announced": [
+        {
+          "tag": "v5.1.0",
+          "url": "https://github.com/expressjs/express/releases/tag/v5.1.0",
+          "quote": "* response: add support for ETag option in res.sendFile by @juanarbol in https://github.com/expressjs/express/pull/6073"
+        },
+        {
+          "tag": "v5.0.0",
+          "url": "https://github.com/expressjs/express/releases/tag/v5.0.0",
+          "quote": "- **Routing changes**: Updated to `path-to-regexp@8.x`, removing sub-expression regex patterns for security reasons (ReDoS mitigation)."
+        }
+      ],
+      "inSource": [
+        {
+          "file": "examples/auth/index.js",
+          "symbol": "res.send",
+          "lines": [
+            "+  if (!req.body) return res.sendStatus(400)"
+          ],
+          "kind": "code"
+        },
+        {
+          "file": "examples/downloads/index.js",
+          "symbol": "req.param",
+          "lines": [
+            "-  res.download(req.params.file, { root: FILES_DIR }, function (err) {",
+            "+  res.download(req.params.file.join('/'), { root: FILES_DIR }, function (err) {"
+          ],
+          "kind": "code"
+        },
+        {
+          "file": "examples/search/index.js",
+          "symbol": "res.send",
+          "lines": [
+            "-    if (err) return res.send(500);"
+          ],
+          "kind": "code"
+        },
+        {
+          "file": "lib/application.js",
+          "symbol": "app.del",
+          "lines": [
+            "-app.del = deprecate.function(app.delete, 'app.del: Use app.delete instead');"
+          ],
+          "kind": "code"
+        }
+      ],
+      "files": [
+        "demo-app/src/payments.ts"
+      ],
+      "compareUrl": "https://github.com/expressjs/express/compare/4.19.2...v5.0.0",
+      "commits": 168,
+      "filesChanged": 74
+    },
+    {
+      "package": "react-dom",
+      "repo": "facebook/react",
+      "pinned": "18.3.1",
+      "latest": "19.2.8",
+      "majorsBehind": 1,
+      "daysSincePinned": 855,
+      "breakAvailableSince": "2024-12-05T18:10:30.516Z",
+      "severity": "loud",
+      "announced": [
+        {
+          "tag": "v19.0.0",
+          "url": "https://github.com/react/react/releases/tag/v19.0.0",
+          "quote": "* Removed: `defaultProps` for functions: ES6 default parameters can be used in place. Class components continue to support `defaultProps` since there is no ES6 alternative."
+        }
+      ],
+      "inSource": [],
+      "files": [
+        "ui/src/main.tsx"
+      ],
+      "compareUrl": "https://github.com/react/react/compare/v18.3.1...v19.0.0",
+      "commits": 4639,
+      "filesChanged": 300
+    },
+    {
+      "package": "eslint",
+      "repo": "eslint/eslint",
+      "pinned": "8.57.0",
+      "latest": "10.9.1",
+      "majorsBehind": 2,
+      "daysSincePinned": 918,
+      "breakAvailableSince": "2024-04-05T20:53:31.118Z",
+      "severity": "loud",
+      "announced": [
+        {
+          "tag": "v10.7.0",
+          "url": "https://github.com/eslint/eslint/releases/tag/v10.7.0",
+          "quote": "* [`9489379`](https://github.com/eslint/eslint/commit/948937986f2aa3cccb27a4c80694a85e5b0a5f64) chore: update dependency @eslint/eslintrc to ^3.3.6 (#21076) (renovate[bot])"
+        },
+        {
+          "tag": "v9.39.5",
+          "url": "https://github.com/eslint/eslint/releases/tag/v9.39.5",
+          "quote": "* [`458205f`](https://github.com/eslint/eslint/commit/458205f7d7a4769f32bec006eecc45c6a71be16a) chore: update `@eslint/eslintrc` and `@eslint/js` for v9.39.5 (#21077) (Francesco Trotta)"
+        }
+      ],
+      "inSource": [
+        {
+          "file": "conf/config-schema.js",
+          "symbol": "eslintrc",
+          "lines": [
+            "- * This file is part of the ongoing work to move the eslintrc-style config",
+            "- * system into the @eslint/eslintrc package. This file needs to remain"
+          ],
+          "kind": "code"
+        },
+        {
+          "file": "lib/cli-engine/cli-engine.js",
+          "symbol": "eslintrc",
+          "lines": [
+            "+        const linter = new Linter({ cwd: options.cwd, configType: \"eslintrc\" });"
+          ],
+          "kind": "code"
+        },
+        {
+          "file": "lib/cli.js",
+          "symbol": "eslintrc",
+          "lines": [
+            "+            process.emitWarning(\"You are using an eslintrc configuration file, which is deprecated and support will be removed in v10.0.0. Please migrate to an eslint.config.js file. See https://eslint.org/docs/latest/use/configure/migration-guide for details.\", \"ESLintRCWarning\");"
+          ],
+          "kind": "code"
+        },
+        {
+          "file": "lib/eslint/eslint.js",
+          "symbol": ".eslintrc",
+          "lines": [
+            "- * @property {boolean} [useEslintrc] False disables looking for .eslintrc.* files."
+          ],
+          "kind": "code"
+        }
+      ],
+      "files": [
+        ".eslintrc.json"
+      ],
+      "compareUrl": "https://github.com/eslint/eslint/compare/v8.57.0...v9.0.0",
+      "commits": 231,
+      "filesChanged": 300
+    }
+  ];
+
 const STORE_KEY = "upstream-watch.mock";
 
 interface MockState { step: number; before?: RunResult; after?: RunResult }
