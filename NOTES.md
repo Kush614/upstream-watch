@@ -561,3 +561,169 @@ question failed. It now asks the adapter whether the harness is genuinely connec
 present one — a missing citation, an unreadable file, a dead session. That is now the sixth
 instance in this project. The tell is always the same: a `catch` that returns the shape of
 success, or a flag set before the work it describes has finished.
+
+## 2026-08-30 — Watching open source is a different problem, and an easier one
+
+The project started by watching SaaS changelog pages, which is the case where you have the
+least to work with: the vendor's page is the *only* source, and if the entry is vague or
+missing, the watch is blind. Dependencies invert that. The changelog is the least
+authoritative source available, because the registry, the release notes and the actual
+source diff are all readable — and the break can be reproduced locally by installing both
+majors, with no key and no rate limit.
+
+Verified against three household repos before building anything:
+
+```
+express 4.19.2 → 5.0.1   res.send(404)      404 "Not Found"   →  200 with body "404"
+react   18.3.1 → 19.0.0  ReactDOM.render    exists            →  removed
+eslint  8.57.0 → 9.15.0  .eslintrc.json     lints             →  "couldn't find eslint.config"
+```
+
+Express leads because it does not throw. React and ESLint fail on the first run; Express
+changes what `res.send(404)` *means*, so the error path returns 200 OK with the body `404`,
+CI stays green and uptime monitoring reports a healthy service.
+
+**Two things I got wrong on the way, both the same shape as ever.**
+
+The registry client asked for `application/vnd.npm.install-v1+json` — much smaller, and
+carries no `time` map. It failed loudly ("express published no plain versions"), which was
+luck: the interesting output is *dates*, and a silent fallback would have produced
+"1 major behind" with no sense that the break has been one `npm update` away since 2024.
+
+`compare()` built tags as the bare version. npm says `5.0.0`, expressjs tags `v5.0.0`, and
+GitHub answered 404 — which, had I caught it as "no files changed", would have rendered as
+**"the source shows no changes"**: the strongest possible reassurance, produced by a typo.
+It now tries the known conventions and throws if none resolve.
+
+**And one honesty fix in my own output.** The first working run reported "38 found in the
+source diff" for express, but the top hits were `History.md`, `README.md` and
+`Contributing.md`. Those are the changelog again, counted a second time under a heading that
+claims to be independent of it — inflating precisely the number this tool exists to compare
+against the announcement. Hits are now split `code` vs `docs`, code first, and a package
+whose only mentions are prose says so.
+
+## 2026-08-30 — Four ways the dependency watcher said "fine" without looking
+
+Qodo found three of these on #16 and the probes surfaced a fourth. Every one produces
+reassurance rather than a visible failure, which is now the recurring shape of every real
+bug in this project.
+
+**GitHub caps a compare at 300 files.** react-dom and eslint both reported *exactly* 300 —
+the tell. Files past the cap were never examined, so "0 changes to anything you call" was
+not a finding, it was the absence of one. `SourceDiff.truncated` now says which it is, and
+the CLI prints the warning next to the count.
+
+**The diff stopped at the next major.** eslint is two majors behind; comparing `8.57.0` to
+`9.0.0` examines none of the 10.x changes and then presents a complete-looking answer. Now
+compares through to latest — express went from 74 files to 105 as a result, meaning 31 files
+of real change had been invisible.
+
+**Release notes stopped at thirty.** A fixed `per_page` answers "were we told about this?"
+with "we did not look far enough". Paginated: eslint's mentions went 7 → 15.
+
+**An unparseable pin read as up to date.** `^4.19.2`, `latest`, a git URL — anything
+`majorOf` could not read fell through to `majorsBehind: 0`, which renders as the *most*
+reassuring answer in the one case where we know the least. It now carries `unparseablePin`
+and the CLI says explicitly that this is not "up to date".
+
+**And one in my own probe.** The eslint probe reported `.eslintrc.json was ignored` for
+ESLint **8**, which would have claimed the old version was already broken and destroyed the
+whole point of the column. The cause: my `.eslintrc.json` set no `parserOptions`, so ESLint
+8 defaulted to ES5 and answered `Parsing error: The keyword 'const' is reserved`. That error
+is ESLint *reading and applying* the config. The probe only looked for the rule name, missed
+it, and inverted the finding. Both outcomes now count as "the config was read"; what proves
+it was not is eslint refusing to run at all.
+
+**`--slurp` cannot be combined with `--jq`** in `gh api`. This one failed loudly and reached
+the UI as `/packages -> 500`, which is the good version of this story: it broke visibly
+instead of returning a short list that looked like a complete one.
+
+## 2026-08-30 — Failure paths in the dependency watcher
+
+**`store()` — `scripts/oss-check.ts`.** Writes `ui/public/packages.json`, which the explorer
+reads when nothing is running. A missing file is the normal first run. An *unreadable* one
+throws rather than being overwritten: replacing the only offline answer the UI has, because
+we could not parse it, would leave the tree empty — and an empty tree reads as "nothing
+upstream can hurt you".
+
+Both writers are now **opt-in** (`--save`). `oss:check` makes four network reads per package
+and `oss:proof` installs two majors of each; a run that is interrupted, rate-limited or
+partial should not be able to replace a good stored answer with a worse one just by being
+the most recent thing that ran.
+
+**`versionsOf()` — the npm registry.** A non-2xx throws `RegistryError` with the status; a
+package with no `latest` dist-tag or no plain x.y.z versions throws rather than returning an
+empty release list, which a caller would read as "nothing published". Callers surface it:
+`oss:check` logs to NOTES.md and exits non-zero, and the explorer refuses to render an empty
+tree.
+
+**`releases()` / `compare()` — the source repository.** Both shell out to `gh` and both
+throw `SourceError` carrying the failing arguments. `compare` is the dangerous one: it tries
+each known tag convention (`v5.0.0`, `5.0.0`, `express@5.0.0`) and throws if none resolve,
+because a 404 caught here would render as **"the source shows no changes"** — the strongest
+reassurance the tool can give, produced by a string-format mismatch.
+
+**`side()` — `scripts/oss-proof.ts`.** A probe that could not be *run* is now distinguished
+from a version that ran and failed. An npm install that 404s and a major that removed your
+function both end with no probe output; calling both "unhealthy" turns a broken network into
+a reported breaking change — a finding about the vendor manufactured by our own
+infrastructure. Such a run reports `INCONCLUSIVE`, never `BROKE`.
+
+**Fakes.** Both external clients now ship fixture-backed fakes (CLAUDE.md §7), and the
+fixtures carry the two cases that matter: express's real `5.0.0-beta.1`, so prerelease
+filtering is actually exercised, and a comparison capped at exactly 300 files.
+
+## 2026-08-30 — A range is not a version, and a probe is not universal
+
+**`^5.2.1` is not "5.2.1 is installed".** `installedVersion` took the floor of the manifest's
+range and called it the installed version. It happens to be right in this checkout, and stops
+being right the moment anyone runs an update — at which point the tool reports a version
+nobody has, against a break that may not apply to the version they do. It now reads
+`node_modules/<pkg>/package.json`, which is the only place that knows, and falls back to the
+range only with `versionIsInstalled: false` attached so callers can say "declared" rather
+than "installed".
+
+**A symbol was still a substring on one side.** `mentions()` checked the character after the
+match but not before, so `myres.send` counted as `res.send` and `config.eslintrc` as
+`.eslintrc`. Both ends are checked now.
+
+**A probe does not speak for every watch.** `agent/probes/express.cjs` exercises `res.send`.
+Running it for the express *dependency* — which is watched for `express.json` and `app.get`,
+and is on a current version — produced a "breaks" result about a call that watch does not
+cover. This is the third appearance of the same mistake: first attaching a proof to the
+wrong row by package name, then to the wrong row by version, and now running one at all for
+a watch it says nothing about. A probe now declares which symbol it exercises, and a
+dependency is proved only when that symbol is one it actually uses.
+
+**An unreadable watched file marked every symbol unused.** Which silently switched the whole
+watch off — the config error rendered as "nothing to worry about". It throws now.
+
+**And NOTES.md is a dev artefact.** `appendNote` wrote to a tracked file from any run,
+including a deployed one. That is mutating source as a side effect of an error, in a
+checkout the process does not own. Off under `NODE_ENV=production`, and `UPSTREAM_WATCH_NOTES=0`
+silences it anywhere.
+
+## 2026-08-30 — "Not production" is not "development"
+
+`notesEnabled()` returned true whenever `NODE_ENV !== "production"`. That also covers CI, a
+test run, a container with no `NODE_ENV` set at all, and anywhere someone deployed without
+setting it — all of which would have been appending to a tracked file in a checkout the
+process does not own. It is opt-IN now: `NODE_ENV=development`, or `UPSTREAM_WATCH_DEV=1`,
+and never under `CI` or `VITEST`.
+
+**Version provenance was computed and then dropped.** `installedVersion` knows whether it
+read `node_modules` or fell back to the manifest's range, and the finding threw that away —
+making a guess indistinguishable from a reading on screen, which is the one difference a
+person needs to judge whether a finding applies to them. The CLI now prints
+`(declared, not installed)` when it is a guess.
+
+**Two watches, one key.** `express` appears twice — a current dependency and a 4→5
+reference — and the proof runner keyed its targets by package name, so one entry's target
+was handed to the other. Keyed by `role:package` now. This is the fourth time the same
+collision has appeared: in node ids, in proof attachment by version, in proof attachment by
+symbol, and now in target lookup. Two things that share a name are not the same thing, and
+this repo keeps learning it one map at a time.
+
+**A reference gathers notes past the version it names.** It documents one step —
+`4.19.2 → 5.2.1` — and collecting release notes from majors above that attributes later
+changes to a comparison that never covered them.
