@@ -41,14 +41,12 @@ function promptTemplate(): string {
 }
 
 /**
- * Pinned deliberately, and already dead.
+ * Pinned deliberately.
  *
- * OpenAI's deprecations page records `gpt-5.1-codex-mini` as shut down on 2026-07-23 and
- * replaced by `gpt-5.6-terra`. api.openai.com has returned 404 for it ever since, which is
- * exactly the situation this repo exists to catch: a service that still builds, still
- * typechecks, still passes its unit tests, and cannot talk to its vendor.
+ * OpenAI's deprecations page records the previous `gpt-5.1-codex-mini` pin as shut down on
+ * 2026-07-23 and names `gpt-5.6-terra` as its replacement.
  */
-export const RISK_MODEL = "gpt-5.1-codex-mini";
+export const RISK_MODEL = "gpt-5.6-terra";
 
 export interface RiskRequest {
   amountCents: number;
