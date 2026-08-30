@@ -44,7 +44,7 @@ export interface VendorRow {
 
 export interface VendorResult {
   entries: number;
-  matches: Array<{ date: string; title: string; url: string; relevance: string; files: string[] }>;
+  matches: Array<{ date: string; title: string; body: string; url: string; relevance: string; files: string[] }>;
   breakingElsewhere: number;
   failed?: string;
   at: string;
@@ -142,6 +142,9 @@ export async function check(root: string, vendor: string): Promise<VendorResult>
       .map((c) => ({
         date: c.entry.date,
         title: c.entry.title,
+        // The row itself, which names the replacement. The title alone quotes only the
+        // model being removed, which is the less useful half of the announcement.
+        body: c.entry.body,
         url: c.entry.url,
         relevance: c.relevance,
         files: c.files,

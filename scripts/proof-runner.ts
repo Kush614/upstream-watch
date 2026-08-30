@@ -56,7 +56,7 @@ async function changelogCitation(): Promise<ChangelogCitation | undefined> {
   changelogLookup ??= (async () => {
     const result = await check(ROOT, "openai");
     const hit = result.matches.find((m) => m.title.includes(OLD_MODEL));
-    return hit ? { date: hit.date, title: hit.title, url: hit.url, body: hit.title } : undefined;
+    return hit ? { date: hit.date, title: hit.title, url: hit.url, body: hit.body } : undefined;
   })();
 
   try {

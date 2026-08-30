@@ -182,7 +182,7 @@ const VENDORS: VendorRow[] = [
     entriesSeen: 59,
     result: {
       entries: 86, breakingElsewhere: 85, at: "2026-08-29T23:52:20.929Z",
-      matches: [{ date: SHUTDOWN, title: "`" + OLD_MODEL + "`", url: CHANGELOG.url, relevance: "symbol-match", files: ["demo-app/src/risk.ts"] }],
+      matches: [{ date: SHUTDOWN, title: "`" + OLD_MODEL + "`", body: CHANGELOG.excerpt, url: CHANGELOG.url, relevance: "symbol-match", files: ["demo-app/src/risk.ts"] }],
     },
   },
   {
