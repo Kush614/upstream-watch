@@ -183,8 +183,33 @@ function packageNode(p: PackageFinding, proof?: OssProof): Node {
 }
 
 /** The whole tree. Groups exist so the reader sees the asymmetry immediately. */
+/**
+ * A proof belongs to a node only if it ran the node's own versions AND exercised a symbol
+ * this node actually watches.
+ *
+ * Both halves are load-bearing, and each one caught a real mislabelling:
+ *
+ *  - versions: keying by package name alone hands the express 4→5 reference proof to the
+ *    express dependency row, which is on 5.2.1 and fine.
+ *  - symbol: the react-dom versions DO match this repo's dependency (18.3.1 → 19.2.8), but
+ *    that proof exercises `ReactDOM.render` and this repo mounts with `createRoot`. Showing
+ *    it against the dependency says "your code breaks" on the strength of a call the repo
+ *    does not make.
+ */
+function proofFor(p: PackageFinding, proofs: OssProof[]): OssProof | undefined {
+  const watched = (p.symbols ?? []).filter((s) => !p.unusedSymbols?.includes(s));
+
+  return proofs.find(
+    (x) =>
+      x.package === p.package &&
+      x.before.version === p.pinned &&
+      x.after.version === p.latest &&
+      // A reference declares the symbol it demonstrates, so it always matches itself.
+      (p.role === "reference" || watched.includes(x.symbol)),
+  );
+}
+
 export function buildTree(vendors: VendorRow[], packages: PackageFinding[], proofs: OssProof[] = []): Node[] {
-  const proofOf = new Map(proofs.map((p) => [p.package, p]));
   const mine = packages.filter((p) => p.role === "dependency");
   const refs = packages.filter((p) => p.role === "reference");
 
@@ -203,7 +228,7 @@ export function buildTree(vendors: VendorRow[], packages: PackageFinding[], proo
       tone: "dim",
       // Only a real dependency gets a proof node: running two majors of something this repo
       // does not install would prove nothing about this repo.
-      children: mine.map((p) => packageNode(p, proofOf.get(p.package))),
+      children: mine.map((p) => packageNode(p, proofFor(p, proofs))),
     },
   ];
 
@@ -216,7 +241,7 @@ export function buildTree(vendors: VendorRow[], packages: PackageFinding[], proo
       label: "Reference breaks",
       badge: "not your code — shown because they are reproducible",
       tone: "dim",
-      children: refs.map((p) => packageNode(p, proofOf.get(p.package))),
+      children: refs.map((p) => packageNode(p, proofFor(p, proofs))),
     });
   }
 

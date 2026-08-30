@@ -45,6 +45,8 @@ export interface PackageFinding {
   truncated?: boolean;
   /** Set when the pin could not be parsed; never rendered as "up to date". */
   unparseablePin?: string;
+  /** Set when the registry's own latest could not be parsed — not the pin's fault. */
+  unparseableLatest?: string;
   files: string[];
 }
 
@@ -75,14 +77,21 @@ export async function checkPackage(p: WatchedPackage): Promise<PackageFinding> {
   // Nothing above the pin means nothing to warn about. Say so by returning empty findings
   // rather than by inventing reassurance.
   finding.unparseablePin = stale.unparseablePin;
-  if (stale.unparseablePin) return finding;
+  finding.unparseableLatest = stale.unparseableLatest;
+  if (stale.unparseablePin || stale.unparseableLatest) return finding;
   if (stale.majorsBehind === 0) return finding;
 
-  for (const note of await releases(p.repo, 30)) {
+  // Match only on symbols this repo actually uses. A declared-but-absent symbol is still
+  // REPORTED (as unusedSymbols) so the config error is visible, but it must not manufacture
+  // a finding about code that does not exist.
+  const used = p.symbols.filter((s) => !p.unusedSymbols?.includes(s));
+  if (used.length === 0) return finding;
+
+  for (const note of await releases(p.repo, 4)) {
     const major = majorOf(note.tag.replace(/^v/, ""));
     if (major === null || major <= (majorOf(p.pinned) ?? 0)) continue;
 
-    for (const symbol of p.symbols) {
+    for (const symbol of used) {
       const line = note.body.split("\n").find((l) => mentions(l, symbol));
       if (line) {
         finding.announced.push({ tag: note.tag, url: note.url, quote: line.trim().slice(0, 200) });
@@ -91,11 +100,12 @@ export async function checkPackage(p: WatchedPackage): Promise<PackageFinding> {
     }
   }
 
-  if (stale.nextMajor) {
-    // Compare through to LATEST, not merely to the next major. eslint is two majors behind:
-    // stopping at 9.0.0 would examine none of the 10.x changes and then report what looks
-    // like a complete answer.
-    const diff = await compare(p.repo, p.pinned, target, p.symbols, p.package);
+  {
+    // Deliberately NOT gated on nextMajor. A package that never published an x.0.0 for the
+    // major above the pin (or tags releases unusually) would otherwise skip the source
+    // comparison altogether and report zero code changes — the reassuring answer, produced
+    // by not looking. The comparison is what we came for; the date is a bonus.
+    const diff = await compare(p.repo, p.pinned, target, used, p.package);
     finding.inSource = diff.hits;
     finding.compareUrl = diff.url;
     finding.commits = diff.commits;
@@ -107,9 +117,12 @@ export async function checkPackage(p: WatchedPackage): Promise<PackageFinding> {
 }
 
 function render(f: PackageFinding): void {
-  if (f.unparseablePin) {
-    console.log(`\n  ${f.package}  pinned as "${f.unparseablePin}" → ${f.latest}`);
-    console.log(`    ⚠ that pin is not a plain x.y.z, so nothing here was checked — this is NOT "up to date"`);
+  if (f.unparseablePin || f.unparseableLatest) {
+    const which = f.unparseablePin
+      ? `your pin "${f.unparseablePin}"`
+      : `the registry's latest "${f.unparseableLatest}"`;
+    console.log(`\n  ${f.package}  ${f.pinned} → ${f.latest}`);
+    console.log(`    ⚠ ${which} is not a plain x.y.z, so nothing here was checked — this is NOT "up to date"`);
     return;
   }
 

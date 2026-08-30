@@ -716,3 +716,51 @@ This is its sharpest form: not an absent *result* dressed as a good one, but an 
 *dependency* dressed as a real one. Configuration that asserts facts about the codebase has
 to be derived from the codebase, or verified against it, or it is just a wish with a colon
 after it.
+
+## 2026-08-30 01:36 - proof runner /packages failed: packages.yaml: "react-dom.pinned" must be a non-empty string
+
+**Where:** scripts/proof-runner.ts
+**Symptom:** packages.yaml: "react-dom.pinned" must be a non-empty string
+**Cause:** _TBD_
+**Fix:** _TBD_
+**Lesson:** _TBD_
+
+## 2026-08-30 01:36 - proof runner /packages failed: packages.yaml: "react-dom.pinned" must be a non-empty string
+
+**Where:** scripts/proof-runner.ts
+**Symptom:** packages.yaml: "react-dom.pinned" must be a non-empty string
+**Cause:** _TBD_
+**Fix:** _TBD_
+**Lesson:** _TBD_
+
+## 2026-08-30 01:44 - proof runner /packages failed: packages.yaml: "react-dom.pinned" must be a non-empty string
+
+**Where:** scripts/proof-runner.ts
+**Symptom:** packages.yaml: "react-dom.pinned" must be a non-empty string
+**Cause:** _TBD_
+**Fix:** _TBD_
+**Lesson:** _TBD_
+
+## 2026-08-30 01:44 - proof runner /packages failed: packages.yaml: "react-dom.pinned" must be a non-empty string
+
+**Where:** scripts/proof-runner.ts
+**Symptom:** packages.yaml: "react-dom.pinned" must be a non-empty string
+**Cause:** _TBD_
+**Fix:** _TBD_
+**Lesson:** _TBD_
+
+## 2026-08-30 02:05 - proof runner /packages failed: packages.yaml: "react-dom.pinned" must be a non-empty string
+
+**Where:** scripts/proof-runner.ts
+**Symptom:** packages.yaml: "react-dom.pinned" must be a non-empty string
+**Cause:** _TBD_
+**Fix:** _TBD_
+**Lesson:** _TBD_
+
+## 2026-08-30 02:10 - proof runner /packages failed: packages.yaml: "react-dom.pinned" must be a non-empty string
+
+**Where:** scripts/proof-runner.ts
+**Symptom:** packages.yaml: "react-dom.pinned" must be a non-empty string
+**Cause:** _TBD_
+**Fix:** _TBD_
+**Lesson:** _TBD_

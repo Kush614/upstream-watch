@@ -20,7 +20,9 @@ export interface PackageVersions {
   releases: Release[];
 }
 
-const REGISTRY = process.env.NPM_REGISTRY ?? "https://registry.npmjs.org";
+// `??` keeps an EMPTY string, and .env.example ships NPM_REGISTRY= with no value — so an
+// unconfigured checkout would request "/express" against nothing at all.
+const REGISTRY = process.env.NPM_REGISTRY?.trim() || "https://registry.npmjs.org";
 
 /** Semver-ish major, or null for anything that is not a plain x.y.z. */
 export function majorOf(version: string): number | null {
@@ -67,7 +69,7 @@ export function staleness(
   versions: PackageVersions,
   pinned: string,
   now = new Date(),
-): { majorsBehind: number; daysSincePinned: number | null; nextMajor: Release | null; unparseablePin?: string } {
+): { majorsBehind: number; daysSincePinned: number | null; nextMajor: Release | null; unparseablePin?: string; unparseableLatest?: string } {
   const pinnedMajor = majorOf(pinned);
   const latestMajor = majorOf(versions.latest);
 
@@ -75,7 +77,15 @@ export function staleness(
   // majorsBehind: 0, which renders as "up to date". A pin we cannot understand is the one
   // case where we know the least, so it must never produce the most reassuring answer.
   if (pinnedMajor === null || latestMajor === null) {
-    return { majorsBehind: 0, daysSincePinned: null, nextMajor: null, unparseablePin: pinned };
+    // Naming the pin when it was LATEST we could not read sends the reader to fix the wrong
+    // file. Say which string defeated us.
+    return {
+      majorsBehind: 0,
+      daysSincePinned: null,
+      nextMajor: null,
+      unparseablePin: pinnedMajor === null ? pinned : undefined,
+      unparseableLatest: latestMajor === null ? versions.latest : undefined,
+    };
   }
 
   const pinnedRelease = versions.releases.find((r) => r.version === pinned) ?? null;

@@ -231,3 +231,35 @@ describe("the explorer's empty state", () => {
     await expect(realAdapter.listVendors()).rejects.toThrow();
   });
 });
+
+describe("attaching a proof to the right row", () => {
+  it("does not label a current dependency with a reference break's receipt", async () => {
+    const { buildTree, findNode } = await import("../src/lib/tree.ts");
+    const a = new MockAdapter();
+    const tree = buildTree(await a.listVendors(), await a.listPackages(), await a.listOssProofs());
+
+    // express appears twice: the real dependency (5.2.1, current) and the 4→5 reference.
+    // Keying a proof by package name alone hands the current row a 404→200 receipt from a
+    // comparison it was never part of.
+    const dep = findNode(tree, "pkg:dependency:express");
+    const ref = findNode(tree, "pkg:reference:express");
+
+    expect(dep?.children?.some((c) => c.id.endsWith(":proof"))).toBe(false);
+    expect(ref?.children?.some((c) => c.id.endsWith(":proof"))).toBe(true);
+  });
+});
+
+describe("a proof must exercise something this repo calls", () => {
+  it("does not claim a dependency breaks over a symbol the repo never uses", async () => {
+    const { buildTree, findNode } = await import("../src/lib/tree.ts");
+    const a = new MockAdapter();
+    const tree = buildTree(await a.listVendors(), await a.listPackages(), await a.listOssProofs());
+
+    // The react-dom versions genuinely match this repo's dependency, so a version-only
+    // check attaches the proof. But that proof exercises ReactDOM.render and ui/src/main.tsx
+    // mounts with createRoot — so it would say "your code breaks" over a call never made.
+    const dep = findNode(tree, "pkg:dependency:react-dom");
+    expect(dep?.children?.some((c) => c.id.endsWith(":proof"))).toBe(false);
+    expect(findNode(tree, "pkg:reference:react-dom")?.children?.some((c) => c.id.endsWith(":proof"))).toBe(true);
+  });
+});
