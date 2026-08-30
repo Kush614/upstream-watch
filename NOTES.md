@@ -561,3 +561,43 @@ question failed. It now asks the adapter whether the harness is genuinely connec
 present one — a missing citation, an unreadable file, a dead session. That is now the sixth
 instance in this project. The tell is always the same: a `catch` that returns the shape of
 success, or a flag set before the work it describes has finished.
+
+## 2026-08-30 — Watching open source is a different problem, and an easier one
+
+The project started by watching SaaS changelog pages, which is the case where you have the
+least to work with: the vendor's page is the *only* source, and if the entry is vague or
+missing, the watch is blind. Dependencies invert that. The changelog is the least
+authoritative source available, because the registry, the release notes and the actual
+source diff are all readable — and the break can be reproduced locally by installing both
+majors, with no key and no rate limit.
+
+Verified against three household repos before building anything:
+
+```
+express 4.19.2 → 5.0.1   res.send(404)      404 "Not Found"   →  200 with body "404"
+react   18.3.1 → 19.0.0  ReactDOM.render    exists            →  removed
+eslint  8.57.0 → 9.15.0  .eslintrc.json     lints             →  "couldn't find eslint.config"
+```
+
+Express leads because it does not throw. React and ESLint fail on the first run; Express
+changes what `res.send(404)` *means*, so the error path returns 200 OK with the body `404`,
+CI stays green and uptime monitoring reports a healthy service.
+
+**Two things I got wrong on the way, both the same shape as ever.**
+
+The registry client asked for `application/vnd.npm.install-v1+json` — much smaller, and
+carries no `time` map. It failed loudly ("express published no plain versions"), which was
+luck: the interesting output is *dates*, and a silent fallback would have produced
+"1 major behind" with no sense that the break has been one `npm update` away since 2024.
+
+`compare()` built tags as the bare version. npm says `5.0.0`, expressjs tags `v5.0.0`, and
+GitHub answered 404 — which, had I caught it as "no files changed", would have rendered as
+**"the source shows no changes"**: the strongest possible reassurance, produced by a typo.
+It now tries the known conventions and throws if none resolve.
+
+**And one honesty fix in my own output.** The first working run reported "38 found in the
+source diff" for express, but the top hits were `History.md`, `README.md` and
+`Contributing.md`. Those are the changelog again, counted a second time under a heading that
+claims to be independent of it — inflating precisely the number this tool exists to compare
+against the announcement. Hits are now split `code` vs `docs`, code first, and a package
+whose only mentions are prose says so.

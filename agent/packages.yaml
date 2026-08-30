@@ -1,0 +1,44 @@
+# Open-source dependencies this repo watches.
+#
+# Distinct from agent/targets.yaml on purpose. A SaaS vendor can only be watched through
+# whatever it chooses to publish — a changelog page is the ONLY source, and if the page is
+# vague or the entry is missing, the watch is blind. A dependency is the opposite: the
+# changelog is the least authoritative source available, because the repository, the diff
+# between two releases, and both versions of the package itself are all readable.
+#
+# So each package here is watched from three places at once:
+#   registry  — which versions exist, when they shipped, how stale you are
+#   releases  — what the maintainers said about it
+#   compare   — what actually changed in the source, which is the part nobody announces
+#
+# And unlike a vendor API, the break can be PROVED locally: install both majors, run the
+# same test against each, and show the difference. No key, no rate limit, no network at
+# demo time once the versions are cached.
+
+packages:
+  express:
+    repo: expressjs/express
+    package: express
+    # The major demo-app's server was written against. See §premise in docs/DEMO.md.
+    pinned: "4.19.2"
+    # What demo-app actually calls. Substring-matched against release notes and the diff.
+    symbols: [res.send, app.del, req.param, path-to-regexp]
+    files: [demo-app/src/payments.ts]
+    # Why this one leads the demo: it does not throw.
+    severity: silent
+
+  react:
+    repo: facebook/react
+    package: react-dom
+    pinned: "18.3.1"
+    symbols: [ReactDOM.render, defaultProps, string refs, unmountComponentAtNode]
+    files: [ui/src/main.tsx]
+    severity: loud
+
+  eslint:
+    repo: eslint/eslint
+    package: eslint
+    pinned: "8.57.0"
+    symbols: [.eslintrc, eslintrc, CLIEngine, --ext]
+    files: [.eslintrc.json]
+    severity: loud
