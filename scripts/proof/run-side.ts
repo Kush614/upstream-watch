@@ -33,7 +33,34 @@ export interface RunResult {
   status: number;
   responseExcerpt: string;
   tests: { passed: number; failed: number; output: string };
+  citations: Citation[];
   at: string;
+}
+
+/**
+ * One claim on the screen, and the thing that backs it.
+ *
+ * Every field here is read back from something that happened — a line in a commit, a
+ * request that was sent, a status that came back. Nothing is written by hand, because a
+ * citation you can compose is worth less than no citation at all.
+ */
+export interface Citation {
+  /** What the reader is being asked to believe. */
+  claim: string;
+  /** The literal evidence, quoted. */
+  evidence: string;
+  /** Where that evidence came from, in words a non-engineer can follow. */
+  source: string;
+  /** Somewhere the reader can go and check for themselves. */
+  url?: string;
+}
+
+/** The vendor's own announcement, when a live scrape found one. */
+export interface ChangelogCitation {
+  date: string;
+  title: string;
+  url: string;
+  body: string;
 }
 
 export interface RunOptions {
@@ -41,6 +68,8 @@ export interface RunOptions {
   side: "before" | "after";
   oldModel: string;
   newModel: string;
+  /** Omitted when the live scrape found nothing: a missing citation beats an invented one. */
+  changelog?: ChangelogCitation;
   emit: (chunk: unknown) => void;
 }
 
@@ -156,7 +185,7 @@ export function countTests(output: string): { passed: number; failed: number } {
 }
 
 export async function runSide(options: RunOptions): Promise<RunResult> {
-  const { root, side, oldModel, newModel, emit } = options;
+  const { root, side, oldModel, newModel, changelog, emit } = options;
   const file = "demo-app/src/risk.ts";
   const sha = (await shas(root, oldModel, newModel, file))[side];
 
@@ -201,12 +230,22 @@ export async function runSide(options: RunOptions): Promise<RunResult> {
     await tree.cleanup();
   }
 
+  // Read the pinned line out of the commit itself rather than assuming which model it used.
+  const pinnedLine =
+    (await git(["show", `${sha}:${file}`], root))
+      .split("\n")
+      .find((l) => l.includes("RISK_MODEL ="))
+      ?.trim() ?? "";
+
   emit({ phase: "request", data: receipt.request });
   emit({ phase: "response", data: { status: receipt.status, excerpt: receipt.excerpt } });
 
   const counts = countTests(output);
   const tests = { ...counts, output: stripAnsi(output).trim().split("\n").slice(-25).join("\n") };
   emit({ phase: "tests", data: tests });
+
+  const citations = citationsFor({ side, sha, file, pinnedLine, receipt, counts, changelog, oldModel });
+  emit({ phase: "citations", data: citations });
 
   return {
     side,
@@ -216,6 +255,62 @@ export async function runSide(options: RunOptions): Promise<RunResult> {
     status: receipt.status,
     responseExcerpt: receipt.excerpt,
     tests,
+    citations,
     at: new Date().toISOString(),
   };
+}
+
+/**
+ * Turn what happened into a chain a reader can follow, one link at a time:
+ * the vendor said → this commit does → so the call was → and the vendor answered → so N tests.
+ */
+function citationsFor(args: {
+  side: "before" | "after";
+  sha: string;
+  file: string;
+  pinnedLine: string;
+  receipt: Receipt;
+  counts: { passed: number; failed: number };
+  changelog?: ChangelogCitation;
+  oldModel: string;
+}): Citation[] {
+  const { side, sha, file, pinnedLine, receipt, counts, changelog, oldModel } = args;
+  const model = (receipt.request.body as { model?: string } | undefined)?.model ?? "an unnamed model";
+  const out: Citation[] = [];
+
+  if (changelog) {
+    out.push({
+      claim: `OpenAI retired ${oldModel} on ${changelog.date}.`,
+      evidence: changelog.body.trim().slice(0, 200),
+      source: "Scraped live from OpenAI's deprecations page during this run.",
+      url: changelog.url,
+    });
+  }
+
+  out.push({
+    claim: `This commit asks for ${model}.`,
+    evidence: pinnedLine || `(no RISK_MODEL line found in ${file})`,
+    source: `Read out of commit ${sha} — ${file}, not from anything typed here.`,
+  });
+
+  out.push({
+    claim:
+      receipt.status === 200
+        ? "OpenAI accepted the request."
+        : `OpenAI refused the request with ${receipt.status}.`,
+    evidence: receipt.excerpt,
+    source: `The reply to the ${receipt.request.method} this commit's own test sent to ${receipt.request.url}.`,
+    url: receipt.request.url,
+  });
+
+  out.push({
+    claim:
+      counts.failed > 0
+        ? `${counts.failed} of this service's tests fail as a result.`
+        : `All ${counts.passed} of this service's tests pass.`,
+    evidence: `${counts.passed} passed, ${counts.failed} failed`,
+    source: `vitest, run against commit ${sha} with today's test suite — the ${side} column.`,
+  });
+
+  return out;
 }

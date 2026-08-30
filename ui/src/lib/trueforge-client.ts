@@ -52,3 +52,48 @@ export async function postDecision(
     throw new TrueForgeClientError(`decision rejected: ${res.status} ${res.statusText}`, { sessionId, status: res.status });
   }
 }
+
+/**
+ * Ask the agent a question in an existing session and wait for its reply.
+ *
+ * The harness chains turns on `previous_turn_id`, so posting while a turn is running forks
+ * the thread. Callers must not send a second question until this resolves.
+ */
+export async function askInSession(sessionId: string, question: string): Promise<string> {
+  const res = await fetch(`${API}/sessions/${encodeURIComponent(sessionId)}/turns`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ stream: false, input: [{ type: "user.message", content: question }] }),
+  });
+
+  if (!res.ok) {
+    throw new TrueForgeClientError(`question rejected: ${res.status} ${res.statusText}`, { sessionId, status: res.status });
+  }
+
+  const turnId = ((await res.json()) as { data?: { id?: string } }).data?.id;
+  if (!turnId) throw new TrueForgeClientError("turn accepted but carried no id", { sessionId });
+
+  // Poll the turn's own events. There is an SSE subscribe route, but a question is one
+  // short answer, and a polled read cannot leave a socket open behind a closed panel.
+  for (let attempt = 0; attempt < 90; attempt++) {
+    await new Promise((r) => setTimeout(r, 2000));
+
+    const turn = await getJson<{ data?: { state?: { status?: string } } }>(
+      `/sessions/${encodeURIComponent(sessionId)}/turns/${encodeURIComponent(turnId)}`,
+    );
+    if (turn.data?.state?.status === "running") continue;
+
+    const events = await getJson<{ data?: Array<Record<string, unknown>> }>(
+      `/sessions/${encodeURIComponent(sessionId)}/turns/${encodeURIComponent(turnId)}/events`,
+    );
+    const said = (events.data ?? [])
+      .map((item) => (item.event ?? item) as { type?: string; content?: unknown })
+      .filter((e) => e.type === "model.message" && typeof e.content === "string" && e.content.trim())
+      .map((e) => e.content as string);
+
+    if (said.length) return said.at(-1) as string;
+    throw new TrueForgeClientError("the agent finished the turn without saying anything", { sessionId, turnId });
+  }
+
+  throw new TrueForgeClientError("the agent did not answer within three minutes", { sessionId, turnId });
+}

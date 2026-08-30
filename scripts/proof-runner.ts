@@ -16,7 +16,8 @@ import { createServer, type ServerResponse } from "node:http";
 import { readFile, writeFile } from "node:fs/promises";
 import { resolve, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { ProofError, runSide, type RunResult } from "./proof/run-side.ts";
+import { ProofError, runSide, type ChangelogCitation, type RunResult } from "./proof/run-side.ts";
+import { WatchlistError, check, rows } from "./proof/watchlist.ts";
 import { appendNote } from "../pipeline/src/lib/notes.ts";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -36,6 +37,36 @@ interface State {
 }
 
 let state: State = {};
+
+/**
+ * OpenAI's own announcement of this shutdown, scraped live once per process.
+ *
+ * Cached because a scrape takes tens of seconds and both columns cite the same entry. If
+ * the scrape finds nothing, the columns render without this citation rather than with a
+ * sentence we wrote ourselves.
+ */
+let changelogLookup: Promise<ChangelogCitation | undefined> | undefined;
+
+async function changelogCitation(): Promise<ChangelogCitation | undefined> {
+  // Cache the PROMISE, not a "tried" flag. Both columns run concurrently, and a flag set
+  // before the await let the second run through with undefined while the first was still
+  // scraping — one column cited the vendor and the other silently did not.
+  changelogLookup ??= (async () => {
+    const result = await check(ROOT, "openai");
+    const hit = result.matches.find((m) => m.title.includes(OLD_MODEL));
+    return hit ? { date: hit.date, title: hit.title, url: hit.url, body: hit.title } : undefined;
+  })();
+
+  try {
+    return await changelogLookup;
+  } catch (error) {
+    await logFailure("changelog citation", error);
+    // Do not cache the failure for the life of the process: a scrape that failed once
+    // because the network blinked should not silence the citation until a restart.
+    changelogLookup = undefined;
+    return undefined;
+  }
+}
 
 async function loadState(): Promise<void> {
   try {
@@ -90,6 +121,20 @@ createServer(async (req, res) => {
   try {
     if (path === "/last") return json(res, 200, state);
 
+    if (path === "/vendors") return json(res, 200, { vendors: await rows(ROOT) });
+
+    if (path === "/vendors/check" && req.method === "POST") {
+      const vendor = url.searchParams.get("vendor") ?? "";
+      try {
+        return json(res, 200, { vendor, result: await check(ROOT, vendor) });
+      } catch (error) {
+        await logFailure(`/vendors/check?vendor=${vendor}`, error);
+        return json(res, error instanceof WatchlistError ? 400 : 500, {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
     if (path === "/run" && req.method === "POST") {
       const side = url.searchParams.get("side") === "before" ? "before" : "after";
       res.statusCode = 200;
@@ -99,6 +144,7 @@ createServer(async (req, res) => {
         // Newline-delimited JSON: each phase reaches the column the moment it happens.
         const result = await runSide({
           root: ROOT, side, oldModel: OLD_MODEL, newModel: NEW_MODEL,
+          changelog: await changelogCitation(),
           emit: (chunk) => res.write(`${JSON.stringify(chunk)}\n`),
         });
         state[side] = result;

@@ -517,3 +517,47 @@ run and writes the exchange to `PROOF_RECEIPT`. If that write fails the file is 
 `runSide` throws rather than reporting the run: a missing receipt must not be filled in from
 the previous one. It never records the `Authorization` header, because the receipt is
 written to disk and then rendered in a browser.
+
+## 2026-08-30 00:14 - proof runner /run?side=before failed: The commit before the fix is not pinned to gpt-5.1-codex-min
+
+**Where:** scripts/proof-runner.ts
+**Symptom:** The commit before the fix is not pinned to gpt-5.1-codex-mini, so this is not the migration being proved
+**Cause:** {"fix":"8799445","parent":"54f03ea","oldModel":"gpt-5.1-codex-mini","newModel":"gpt-5.6-terra"}
+**Fix:** _TBD_
+**Lesson:** _TBD_
+
+## 2026-08-30 — Failure paths in the watchlist, citations and Studio
+
+**`askInSession` — `ui/src/lib/trueforge-client.ts`.** Posts a question as a real turn and
+then polls that turn's own events. Three ways it gives up, all of them loud:
+a non-2xx on the post throws `TrueForgeClientError`; a turn that finishes without the agent
+saying anything throws rather than rendering an empty answer; and a turn still running after
+**three minutes** (90 polls, 2s apart) throws "the agent did not answer within three
+minutes". The bound matters — an unbounded wait leaves the composer locked forever with no
+explanation, and the person cannot tell that from the agent thinking hard. The Studio shows
+the failure against the question that caused it.
+
+**`changelogCitation()` — proof runner.** Scrapes OpenAI live to quote their own
+announcement. The first version cached a `tried` flag set *before* the await, so with both
+columns running concurrently the second run sailed past with `undefined` — one column cited
+the vendor and the other silently did not, which reads as though no announcement exists. It
+now caches the promise. A *failed* lookup is no longer cached at all: a scrape that failed
+once because the network blinked should not silence the citation until the runner restarts.
+When there is genuinely no matching entry, the citation is omitted rather than written by
+hand.
+
+**`rows()` — watchlist.** A missing state file means a vendor has never been checked, and
+that is an honest row. An *unreadable* one — truncated JSON, bad permissions — used to be
+caught by the same handler and shown as "never", which is the opposite claim: it turns a
+broken watchlist into what looks like valid coverage. Only `ENOENT` is now treated as
+"never"; anything else is reported in the row as an error.
+
+**`Studio` liveness.** `sessionKnown` was derived from "are there events on screen", but
+offline those events come from the frozen `/session.json` capture — which also carries a
+session id. The composer therefore looked usable with no harness behind it, and every
+question failed. It now asks the adapter whether the harness is genuinely connected.
+
+**Lesson, again and in a new place:** every one of these is an absent thing rendered as a
+present one — a missing citation, an unreadable file, a dead session. That is now the sixth
+instance in this project. The tell is always the same: a `catch` that returns the shape of
+success, or a flag set before the work it describes has finished.

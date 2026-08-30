@@ -9,7 +9,7 @@
  * same thing and cannot drift apart.
  */
 
-import type { Adapter, RunChunk, RunResult, UiEvent } from "./adapter.ts";
+import { WatchlistError, type Adapter, type Citation, type RunChunk, type RunResult, type UiEvent, type VendorResult, type VendorRow } from "./adapter.ts";
 
 const VENDOR = "openai";
 const SHUTDOWN = "2026-07-23";
@@ -108,9 +108,93 @@ function resultFor(side: "before" | "after"): RunResult {
     tests: broken
       ? { passed: 9, failed: 3, output: "FAIL demo-app/test/vendors.test.ts\n  x uses the model this service is pinned to\n  x POST /payments returns 201\n  x risk level is parsed\n\n  9 passed | 3 failed" }
       : { passed: 12, failed: 0, output: TEST_OUTPUT || "  12 passed (12)" },
+    citations: citationsFor(side, broken),
     at: new Date().toISOString(),
   };
 }
+
+/**
+ * The same four links the real runner builds, from the same captured facts.
+ *
+ * Offline this is a replay, not an invention: every quote below came off the real page or a
+ * real run, which is why the mock is safe to show when the network is not.
+ */
+function citationsFor(side: "before" | "after", broken: boolean): Citation[] {
+  const model = side === "before" ? OLD_MODEL : NEW_MODEL;
+  return [
+    {
+      claim: "OpenAI retired `" + OLD_MODEL + "` on " + SHUTDOWN + ".",
+      evidence: CHANGELOG.excerpt,
+      source: "OpenAI's deprecations page.",
+      url: CHANGELOG.url,
+    },
+    {
+      claim: "This commit asks for " + model + ".",
+      evidence: 'export const RISK_MODEL = "' + model + '";',
+      source: "Read out of the commit — demo-app/src/risk.ts.",
+    },
+    {
+      claim: broken ? "OpenAI refused the request with 404." : "OpenAI accepted the request.",
+      evidence: broken ? FAIL_BODY : OK_BODY,
+      source: "The reply to the POST this commit's own test sent to api.openai.com.",
+      url: "https://api.openai.com/v1/responses",
+    },
+    {
+      claim: broken ? "3 of this service's tests fail as a result." : "All 12 of this service's tests pass.",
+      evidence: broken ? "9 passed, 3 failed" : "12 passed, 0 failed",
+      source: "vitest, run against that commit with today's test suite.",
+    },
+  ];
+}
+
+/**
+ * The four vendors agent/targets.yaml watches, captured verbatim from a real /vendors
+ * response. Guessed numbers here would be the same fabrication the columns refuse to make.
+ */
+const VENDORS: VendorRow[] = [
+  {
+    vendor: "stripe",
+    url: "https://docs.stripe.com/changelog",
+    source: "cache",
+    pinnedBecause:
+      "Bright Data refuses docs.stripe.com (policy_20050 \u2014 payments domains are KYC-gated), so this vendor is watched from a committed real capture.",
+    symbols: ["charges.create", "payment_intents", "Charge#create", "PaymentIntent#create"],
+    files: ["demo-app/src/payments.ts"],
+    lastCheck: "2026-08-29T22:57:33.618Z",
+    entriesSeen: 40,
+  },
+  {
+    vendor: "cloudflare",
+    url: "https://developers.cloudflare.com/changelog/",
+    source: "live",
+    symbols: ["purge_cache", "/client/v4/zones", "Cache Rules", "cache reserve"],
+    files: ["demo-app/src/cdn.ts"],
+    lastCheck: "2026-08-29T22:57:35.190Z",
+    entriesSeen: 25,
+  },
+  {
+    vendor: "openai",
+    url: "https://platform.openai.com/docs/deprecations",
+    source: "live",
+    symbols: ["gpt-5.1-codex-mini", "gpt-5.6-terra", "gpt-5-mini-2025-08-07", "gpt-5-mini", "v1/prompts", "chat/completions"],
+    files: ["demo-app/src/risk.ts"],
+    lastCheck: "2026-08-29T22:57:34.899Z",
+    entriesSeen: 59,
+    result: {
+      entries: 86, breakingElsewhere: 85, at: "2026-08-29T23:52:20.929Z",
+      matches: [{ date: SHUTDOWN, title: "`" + OLD_MODEL + "`", url: CHANGELOG.url, relevance: "symbol-match", files: ["demo-app/src/risk.ts"] }],
+    },
+  },
+  {
+    vendor: "slack",
+    url: "https://docs.slack.dev/changelog",
+    source: "live",
+    symbols: ["chat.postMessage", "conversations.", "Workflow Steps"],
+    files: ["demo-app/src/notify.ts"],
+    lastCheck: "2026-08-29T22:57:35.867Z",
+    entriesSeen: 221,
+  },
+];
 
 const STORE_KEY = "upstream-watch.mock";
 
@@ -213,6 +297,27 @@ export class MockAdapter implements Adapter {
 
   async loadLastRun() {
     return { before: this.#state.before, after: this.#state.after };
+  }
+
+  async listVendors(): Promise<VendorRow[]> {
+    return VENDORS;
+  }
+
+  async checkVendor(vendor: string): Promise<VendorResult> {
+    const row = VENDORS.find((v) => v.vendor === vendor);
+    if (!row) throw new WatchlistError(`${vendor} is not on the watchlist`);
+    return row.result ?? { entries: row.entriesSeen, matches: [], breakingElsewhere: 0, at: new Date().toISOString() };
+  }
+
+  hasLiveSession(): boolean {
+    // The mock is a recording. There is nothing on the other end of the composer.
+    return false;
+  }
+
+  async ask(question: string): Promise<string> {
+    // Offline there is no agent to ask, and inventing an answer in its voice would be the
+    // one thing this UI must never do. Say so plainly instead.
+    return `The harness is not running, so I cannot ask the agent "${question}". This page is showing a recorded run; start TrueForge and reload to ask it anything.`;
   }
 }
 

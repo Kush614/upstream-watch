@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { RunResult } from "../adapter.ts";
+import { Citations } from "./Citations.tsx";
 
 /** Highlight the one key the vendor removed, so the difference is visible at a glance. */
 function RequestBody({ request, changedKey }: { request: unknown; changedKey?: string }) {
@@ -80,6 +81,8 @@ export function ProofColumn({ label, result, running }: {
               {result.tests.output || "(no output)"}
             </pre>
           )}
+
+          <Citations citations={result.citations ?? []} tone={result.tests.failed > 0 ? "bad" : "ok"} />
         </>
       )}
     </section>
