@@ -65,6 +65,68 @@ export interface Citation {
   url?: string;
 }
 
+/**
+ * A watched open-source dependency.
+ *
+ * Mirrors `PackageFinding` in scripts/oss-check.ts. Three sources per package, kept
+ * separate rather than merged into a verdict, because where they disagree IS the finding.
+ */
+export interface PackageFinding {
+  package: string;
+  /** A finding about this repo, or a demonstration that explicitly is not one. */
+  role: "dependency" | "reference";
+  /** Why a reference is shown, and that it does not apply here. */
+  note?: string;
+  /** Declared symbols found in none of the watched files. */
+  unusedSymbols?: string[];
+  repo: string;
+  pinned: string;
+  latest: string;
+  majorsBehind: number;
+  daysSincePinned: number | null;
+  /** When the first major above the pin shipped — the day the break became reachable. */
+  breakAvailableSince: string | null;
+  /** `silent` means the old call still works and now means something else. */
+  severity: "silent" | "loud";
+  announced: Array<{ tag: string; url: string; quote: string }>;
+  inSource: Array<{ file: string; symbol: string; lines: string[]; kind: "code" | "docs" }>;
+  compareUrl?: string;
+  commits?: number;
+  filesChanged?: number;
+  /** True when GitHub capped the file list — "nothing found" then means "not fully looked". */
+  truncated?: boolean;
+  /** Set when the pin could not be parsed; never rendered as "up to date". */
+  unparseablePin?: string;
+  files: string[];
+  symbols?: string[];
+}
+
+/**
+ * One dependency break, proved by running both versions.
+ *
+ * Mirrors `OssProof` in scripts/oss-proof.ts. The two sides ran the SAME probe, which is
+ * what makes them comparable — running different code against each version would prove only
+ * that two different programs behave differently.
+ */
+export interface OssProof {
+  package: string;
+  repo: string;
+  symbol: string;
+  severity: "silent" | "loud";
+  before: OssSide;
+  after: OssSide;
+  /** The probe source, so the method can be read rather than trusted. */
+  probe: string;
+  at: string;
+}
+
+export interface OssSide {
+  version: string;
+  observed: string;
+  detail: string;
+  healthy: boolean;
+}
+
 /** One vendor on the watchlist, and what the last look at it found. */
 export interface VendorRow {
   vendor: string;
@@ -106,6 +168,12 @@ export interface Adapter {
   listVendors(): Promise<VendorRow[]>;
   /** Check one vendor for real. Never consumes state the agent still has to find. */
   checkVendor(vendor: string): Promise<VendorResult>;
+
+  /** Every watched dependency, read from its registry, its releases and its source. */
+  listPackages(): Promise<PackageFinding[]>;
+
+  /** What actually happened when both versions of each dependency were run. */
+  listOssProofs(): Promise<OssProof[]>;
 
   /**
    * Whether there is a live agent session to talk to *right now*.

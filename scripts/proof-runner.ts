@@ -18,6 +18,8 @@ import { resolve, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { ProofError, runSide, type ChangelogCitation, type RunResult } from "./proof/run-side.ts";
 import { WatchlistError, check, rows } from "./proof/watchlist.ts";
+import { loadPackages } from "../pipeline/src/lib/packages.ts";
+import { checkPackage } from "./oss-check.ts";
 import { appendNote } from "../pipeline/src/lib/notes.ts";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -122,6 +124,16 @@ createServer(async (req, res) => {
     if (path === "/last") return json(res, 200, state);
 
     if (path === "/vendors") return json(res, 200, { vendors: await rows(ROOT) });
+
+    if (path === "/packages") {
+      // Three network reads per package, so this is deliberately not on the hot path: the
+      // UI asks once and the explorer keeps the answer.
+      const watched = await loadPackages();
+      const findings = await Promise.all(
+        watched.map(async (p) => ({ ...(await checkPackage(p)), symbols: p.symbols })),
+      );
+      return json(res, 200, { packages: findings });
+    }
 
     if (path === "/vendors/check" && req.method === "POST") {
       const vendor = url.searchParams.get("vendor") ?? "";

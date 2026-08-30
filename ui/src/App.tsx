@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { currentPhase, mergedDetail, type Adapter, type Phase, type RunResult, type UiEvent, type VendorRow } from "./adapter.ts";
+import { currentPhase, mergedDetail, type Adapter, type Phase, type RunResult, type UiEvent, type VendorRow, type PackageFinding, type OssProof } from "./adapter.ts";
 import { mockAdapter } from "./adapter.mock.ts";
 import { realAdapter } from "./adapter.real.ts";
 import { HEADLINES, fill } from "./copy.ts";
@@ -9,6 +9,7 @@ import { ProofColumn } from "./components/ProofColumn.tsx";
 import { NeedsYou } from "./components/NeedsYou.tsx";
 import { Receipts } from "./components/Receipts.tsx";
 import { Watchlist } from "./components/Watchlist.tsx";
+import { Explorer } from "./components/Explorer.tsx";
 import { Studio } from "./components/Studio.tsx";
 import { useSound } from "./lib/useSound.ts";
 
@@ -24,6 +25,9 @@ export function App() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [vendors, setVendors] = useState<VendorRow[]>([]);
+  const [packages, setPackages] = useState<PackageFinding[]>([]);
+  const [ossProofs, setOssProofs] = useState<OssProof[]>([]);
+  const [upstreamProblem, setUpstreamProblem] = useState<string>();
   const [sound, setSound] = useState(false);
   const play = useSound(sound);
   const lastPhase = useRef<Phase>("idle");
@@ -39,10 +43,10 @@ export function App() {
 
     // The watchlist is a separate claim with a separate failure mode: if the runner is
     // down, an empty table would read as "nothing is watched", so say why instead.
-    void adapter
-      .listVendors()
-      .then(setVendors)
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)));
+    const surface = (e: unknown) => setUpstreamProblem(e instanceof Error ? e.message : String(e));
+    void adapter.listVendors().then(setVendors).catch(surface);
+    void adapter.listPackages().then(setPackages).catch(surface);
+    void adapter.listOssProofs().then(setOssProofs).catch(surface);
 
     return adapter.subscribe((e) => setEvents((prev) => [...prev, e]));
   }, []);
@@ -150,6 +154,8 @@ export function App() {
           <ProofColumn label="before" result={before} running={running} />
           <ProofColumn label="after" result={after} running={running} />
         </div>
+
+        <Explorer vendors={vendors} packages={packages} proofs={ossProofs} problem={upstreamProblem} />
 
         <Watchlist rows={vendors} onCheck={(v) => adapter.checkVendor(v)} />
 

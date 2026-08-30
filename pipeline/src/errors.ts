@@ -29,3 +29,9 @@ export class TrueForgeError extends UpstreamWatchError {}
 
 /** The harness answered, but had nothing usable to snapshot. */
 export class NoSnapshotDataError extends UpstreamWatchError {}
+
+/** The npm registry could not be read, or answered with something unusable. */
+export class RegistryError extends UpstreamWatchError {}
+
+/** A source repository could not be read — releases, or the diff between two releases. */
+export class SourceError extends UpstreamWatchError {}

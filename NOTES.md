@@ -561,3 +561,206 @@ question failed. It now asks the adapter whether the harness is genuinely connec
 present one — a missing citation, an unreadable file, a dead session. That is now the sixth
 instance in this project. The tell is always the same: a `catch` that returns the shape of
 success, or a flag set before the work it describes has finished.
+
+## 2026-08-30 — Watching open source is a different problem, and an easier one
+
+The project started by watching SaaS changelog pages, which is the case where you have the
+least to work with: the vendor's page is the *only* source, and if the entry is vague or
+missing, the watch is blind. Dependencies invert that. The changelog is the least
+authoritative source available, because the registry, the release notes and the actual
+source diff are all readable — and the break can be reproduced locally by installing both
+majors, with no key and no rate limit.
+
+Verified against three household repos before building anything:
+
+```
+express 4.19.2 → 5.0.1   res.send(404)      404 "Not Found"   →  200 with body "404"
+react   18.3.1 → 19.0.0  ReactDOM.render    exists            →  removed
+eslint  8.57.0 → 9.15.0  .eslintrc.json     lints             →  "couldn't find eslint.config"
+```
+
+Express leads because it does not throw. React and ESLint fail on the first run; Express
+changes what `res.send(404)` *means*, so the error path returns 200 OK with the body `404`,
+CI stays green and uptime monitoring reports a healthy service.
+
+**Two things I got wrong on the way, both the same shape as ever.**
+
+The registry client asked for `application/vnd.npm.install-v1+json` — much smaller, and
+carries no `time` map. It failed loudly ("express published no plain versions"), which was
+luck: the interesting output is *dates*, and a silent fallback would have produced
+"1 major behind" with no sense that the break has been one `npm update` away since 2024.
+
+`compare()` built tags as the bare version. npm says `5.0.0`, expressjs tags `v5.0.0`, and
+GitHub answered 404 — which, had I caught it as "no files changed", would have rendered as
+**"the source shows no changes"**: the strongest possible reassurance, produced by a typo.
+It now tries the known conventions and throws if none resolve.
+
+**And one honesty fix in my own output.** The first working run reported "38 found in the
+source diff" for express, but the top hits were `History.md`, `README.md` and
+`Contributing.md`. Those are the changelog again, counted a second time under a heading that
+claims to be independent of it — inflating precisely the number this tool exists to compare
+against the announcement. Hits are now split `code` vs `docs`, code first, and a package
+whose only mentions are prose says so.
+
+## 2026-08-30 — Four ways the dependency watcher said "fine" without looking
+
+Qodo found three of these on #16 and the probes surfaced a fourth. Every one produces
+reassurance rather than a visible failure, which is now the recurring shape of every real
+bug in this project.
+
+**GitHub caps a compare at 300 files.** react-dom and eslint both reported *exactly* 300 —
+the tell. Files past the cap were never examined, so "0 changes to anything you call" was
+not a finding, it was the absence of one. `SourceDiff.truncated` now says which it is, and
+the CLI prints the warning next to the count.
+
+**The diff stopped at the next major.** eslint is two majors behind; comparing `8.57.0` to
+`9.0.0` examines none of the 10.x changes and then presents a complete-looking answer. Now
+compares through to latest — express went from 74 files to 105 as a result, meaning 31 files
+of real change had been invisible.
+
+**Release notes stopped at thirty.** A fixed `per_page` answers "were we told about this?"
+with "we did not look far enough". Paginated: eslint's mentions went 7 → 15.
+
+**An unparseable pin read as up to date.** `^4.19.2`, `latest`, a git URL — anything
+`majorOf` could not read fell through to `majorsBehind: 0`, which renders as the *most*
+reassuring answer in the one case where we know the least. It now carries `unparseablePin`
+and the CLI says explicitly that this is not "up to date".
+
+**And one in my own probe.** The eslint probe reported `.eslintrc.json was ignored` for
+ESLint **8**, which would have claimed the old version was already broken and destroyed the
+whole point of the column. The cause: my `.eslintrc.json` set no `parserOptions`, so ESLint
+8 defaulted to ES5 and answered `Parsing error: The keyword 'const' is reserved`. That error
+is ESLint *reading and applying* the config. The probe only looked for the rule name, missed
+it, and inverted the finding. Both outcomes now count as "the config was read"; what proves
+it was not is eslint refusing to run at all.
+
+**`--slurp` cannot be combined with `--jq`** in `gh api`. This one failed loudly and reached
+the UI as `/packages -> 500`, which is the good version of this story: it broke visibly
+instead of returning a short list that looked like a complete one.
+
+## 2026-08-30 01:03 - proof runner /packages failed: reading releases for eslint/eslint failed: Get "https://api.
+
+**Where:** scripts/proof-runner.ts
+**Symptom:** reading releases for eslint/eslint failed: Get "https://api.github.com/repositories/11061773/releases?per_page=100&page=2": read tcp 172.30.30.148:61783->172.182.252.137:443: read: connection reset by peer
+**Cause:** _TBD_
+**Fix:** _TBD_
+**Lesson:** _TBD_
+
+## 2026-08-30 01:30 - proof runner /packages failed: packages.yaml: "react-dom.pinned" must be a non-empty string
+
+**Where:** scripts/proof-runner.ts
+**Symptom:** packages.yaml: "react-dom.pinned" must be a non-empty string
+**Cause:** _TBD_
+**Fix:** _TBD_
+**Lesson:** _TBD_
+
+## 2026-08-30 01:32 - proof runner /packages failed: packages.yaml: "react-dom.pinned" must be a non-empty string
+
+**Where:** scripts/proof-runner.ts
+**Symptom:** packages.yaml: "react-dom.pinned" must be a non-empty string
+**Cause:** _TBD_
+**Fix:** _TBD_
+**Lesson:** _TBD_
+
+## 2026-08-30 01:33 - proof runner /packages failed: packages.yaml: "react-dom.pinned" must be a non-empty string
+
+**Where:** scripts/proof-runner.ts
+**Symptom:** packages.yaml: "react-dom.pinned" must be a non-empty string
+**Cause:** _TBD_
+**Fix:** _TBD_
+**Lesson:** _TBD_
+
+## 2026-08-30 01:33 - proof runner /packages failed: packages.yaml: "react-dom.pinned" must be a non-empty string
+
+**Where:** scripts/proof-runner.ts
+**Symptom:** packages.yaml: "react-dom.pinned" must be a non-empty string
+**Cause:** _TBD_
+**Fix:** _TBD_
+**Lesson:** _TBD_
+
+## 2026-08-30 — The watcher was inventing findings about our own code
+
+The sharpest review this project has had. `agent/packages.yaml` asserted, by hand, that this
+repo pinned `express` at `4.19.2`, called `ReactDOM.render`, and depended on `eslint`.
+
+None of it was true. `demo-app` depends on `express@^5.2.1`. `ui/src/main.tsx` mounts with
+`createRoot`. There is no eslint in any manifest and no config file in the tree. Every
+finding produced from those lines was a finding about code that does not exist — which is
+precisely the failure this project exists to prevent, committed by the project itself.
+
+The cause was structural, not careless: a hand-written `pinned:` field is a claim that
+drifts the moment anyone runs an upgrade, and a hand-written `symbols:` list is a claim that
+was never checked against the source at all.
+
+**What changed.** Two roles, and the separation is load-bearing:
+
+- `role: dependency` — the version is **read from the workspace manifest**, never written
+  down. Symbols are checked against the files that claim to use them, and any that appear in
+  none of them are reported as "declared but not found" rather than silently watched.
+  Declaring a dependency the manifest does not list now throws.
+- `role: reference` — a known historical break, kept because it is genuinely reproducible,
+  labelled `[reference — not this repo]` in the CLI and grouped separately in the UI.
+
+**And the results changed with it.** express is now correctly reported as *up to date*, and
+`react-dom` surfaced as a real finding: `ui` is on 18.3.1 while 19.2.8 is current.
+
+**A related false positive, same review.** Symbol matching was `String.includes`, so
+`res.send` matched `res.sendFile` — an express 5.1.0 note about "ETag option in
+res.sendFile" was being counted as an announcement about `res.send`. With that fixed,
+express's announced-mentions went 2 → 0, which means the release notes never mentioned the
+change at all, and the "the source changes something you use and the release notes do not
+mention it" warning fires correctly for the first time.
+
+**Lesson.** The recurring bug in this project is an absent thing rendered as a present one.
+This is its sharpest form: not an absent *result* dressed as a good one, but an absent
+*dependency* dressed as a real one. Configuration that asserts facts about the codebase has
+to be derived from the codebase, or verified against it, or it is just a wish with a colon
+after it.
+
+## 2026-08-30 01:36 - proof runner /packages failed: packages.yaml: "react-dom.pinned" must be a non-empty string
+
+**Where:** scripts/proof-runner.ts
+**Symptom:** packages.yaml: "react-dom.pinned" must be a non-empty string
+**Cause:** _TBD_
+**Fix:** _TBD_
+**Lesson:** _TBD_
+
+## 2026-08-30 01:36 - proof runner /packages failed: packages.yaml: "react-dom.pinned" must be a non-empty string
+
+**Where:** scripts/proof-runner.ts
+**Symptom:** packages.yaml: "react-dom.pinned" must be a non-empty string
+**Cause:** _TBD_
+**Fix:** _TBD_
+**Lesson:** _TBD_
+
+## 2026-08-30 01:44 - proof runner /packages failed: packages.yaml: "react-dom.pinned" must be a non-empty string
+
+**Where:** scripts/proof-runner.ts
+**Symptom:** packages.yaml: "react-dom.pinned" must be a non-empty string
+**Cause:** _TBD_
+**Fix:** _TBD_
+**Lesson:** _TBD_
+
+## 2026-08-30 01:44 - proof runner /packages failed: packages.yaml: "react-dom.pinned" must be a non-empty string
+
+**Where:** scripts/proof-runner.ts
+**Symptom:** packages.yaml: "react-dom.pinned" must be a non-empty string
+**Cause:** _TBD_
+**Fix:** _TBD_
+**Lesson:** _TBD_
+
+## 2026-08-30 02:05 - proof runner /packages failed: packages.yaml: "react-dom.pinned" must be a non-empty string
+
+**Where:** scripts/proof-runner.ts
+**Symptom:** packages.yaml: "react-dom.pinned" must be a non-empty string
+**Cause:** _TBD_
+**Fix:** _TBD_
+**Lesson:** _TBD_
+
+## 2026-08-30 02:10 - proof runner /packages failed: packages.yaml: "react-dom.pinned" must be a non-empty string
+
+**Where:** scripts/proof-runner.ts
+**Symptom:** packages.yaml: "react-dom.pinned" must be a non-empty string
+**Cause:** _TBD_
+**Fix:** _TBD_
+**Lesson:** _TBD_

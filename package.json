@@ -23,7 +23,9 @@
     "ui": "pnpm --filter ui dev",
     "demo:seed": "node --env-file-if-exists=.env --experimental-strip-types scripts/seed.ts",
     "demo:snapshot": "node --env-file-if-exists=.env --experimental-strip-types scripts/snapshot-session.ts",
-    "proof": "node --env-file-if-exists=.env --experimental-strip-types scripts/proof-runner.ts"
+    "proof": "node --env-file-if-exists=.env --experimental-strip-types scripts/proof-runner.ts",
+    "oss:check": "node --env-file-if-exists=.env --experimental-strip-types scripts/oss-check.ts",
+    "oss:proof": "node --env-file-if-exists=.env --experimental-strip-types scripts/oss-proof.ts"
   },
   "devDependencies": {
     "typescript": "^5.6.0",

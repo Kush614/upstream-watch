@@ -1,0 +1,62 @@
+[
+  {
+    "package": "express",
+    "repo": "expressjs/express",
+    "symbol": "res.send",
+    "severity": "silent",
+    "before": {
+      "version": "4.19.2",
+      "observed": "HTTP 404",
+      "detail": "res.send(404) replied 404 with body \"Not Found\"",
+      "healthy": true
+    },
+    "after": {
+      "version": "5.2.1",
+      "observed": "HTTP 200",
+      "detail": "res.send(404) replied 200 with body \"404\"",
+      "healthy": false
+    },
+    "probe": "/**\n * Does `res.send(404)` still mean \"reply 404\"?\n *\n * Express 4 answered 404 and warned. Express 5 removed the overload, so the number is\n * treated as a body: the same line now replies 200 with the text \"404\". Nothing throws,\n * which is why this probe has to look at the response rather than catch an error.\n */\nconst express = require(\"express\");\n\nconst app = express();\napp.get(\"/thing\", (_req, res) => res.send(404));\n\nconst server = app.listen(0, async () => {\n  const { port } = server.address();\n  const res = await fetch(`http://127.0.0.1:${port}/thing`);\n  const body = (await res.text()).slice(0, 40);\n\n  console.log(JSON.stringify({\n    observed: `HTTP ${res.status}`,\n    detail: `res.send(404) replied ${res.status} with body ${JSON.stringify(body)}`,\n    healthy: res.status === 404,\n  }));\n  server.close();\n});\n",
+    "at": "2026-08-30T00:44:38.301Z"
+  },
+  {
+    "package": "react-dom",
+    "repo": "facebook/react",
+    "symbol": "ReactDOM.render",
+    "severity": "loud",
+    "before": {
+      "version": "18.3.1",
+      "observed": "ReactDOM.render exists",
+      "detail": "the legacy mount API is callable",
+      "healthy": true
+    },
+    "after": {
+      "version": "19.2.8",
+      "observed": "ReactDOM.render is undefined",
+      "detail": "removed — react-dom now exports: createPortal, flushSync, preconnect, prefetchDNS, preinit, preinitModule, preload, preloadModule, requestFormReset, unstable_batchedUpdates, useFormState, useFormStatus, version",
+      "healthy": false
+    },
+    "probe": "/**\n * Is `ReactDOM.render` still there?\n *\n * The mount call every React tutorial taught for a decade. React 19 removed it outright,\n * so this one fails loudly on the first run — the opposite of the express case.\n */\nconst ReactDOM = require(\"react-dom\");\n\nconst present = typeof ReactDOM.render === \"function\";\nconsole.log(JSON.stringify({\n  observed: present ? \"ReactDOM.render exists\" : \"ReactDOM.render is undefined\",\n  detail: present\n    ? \"the legacy mount API is callable\"\n    : `removed — react-dom now exports: ${Object.keys(ReactDOM).filter((k) => !k.startsWith(\"__\")).join(\", \")}`,\n  healthy: present,\n}));\n",
+    "at": "2026-08-30T00:44:38.612Z"
+  },
+  {
+    "package": "eslint",
+    "repo": "eslint/eslint",
+    "symbol": ".eslintrc",
+    "severity": "loud",
+    "before": {
+      "version": "8.57.0",
+      "observed": ".eslintrc.json was read",
+      "detail": "linted the file and reported no-unused-vars, so the config applied",
+      "healthy": true
+    },
+    "after": {
+      "version": "10.9.1",
+      "observed": ".eslintrc.json was ignored",
+      "detail": "ESLint couldn't find an eslint",
+      "healthy": false
+    },
+    "probe": "/**\n * Is `.eslintrc.json` still read?\n *\n * ESLint 9 made flat config the only format. A repo with an .eslintrc and no\n * eslint.config.js does not lint with different rules — it does not lint at all.\n */\nconst { execFileSync } = require(\"node:child_process\");\nconst { writeFileSync } = require(\"node:fs\");\n\n// parserOptions is not optional here. Without it ESLint 8 defaults to ES5 and answers\n// \"Parsing error: The keyword 'const' is reserved\" — which is the config being READ and\n// applied. A probe that only looks for the rule name reads that as \"config ignored\" and\n// reports the old version as already broken.\nwriteFileSync(\n  \".eslintrc.json\",\n  JSON.stringify({\n    env: { node: true, es2022: true },\n    parserOptions: { ecmaVersion: 2022, sourceType: \"script\" },\n    rules: { \"no-unused-vars\": \"error\" },\n  }),\n);\nwriteFileSync(\"probe-target.js\", \"const unused = 1;\\n\");\n\nlet out = \"\";\nlet ok = false;\ntry {\n  execFileSync(\"npx\", [\"eslint\", \"probe-target.js\"], { encoding: \"utf8\", stdio: \"pipe\" });\n} catch (error) {\n  out = `${error.stdout ?? \"\"}${error.stderr ?? \"\"}`;\n  // Reporting the unused variable IS the healthy outcome: it means the config was read.\n  // Either outcome proves the config was read: the rule fired, or the parser it configured\n  // rejected the file. What proves it was NOT read is eslint refusing to run at all.\n  ok = out.includes(\"no-unused-vars\") || out.includes(\"Parsing error\");\n}\n\nconsole.log(JSON.stringify({\n  observed: ok ? \".eslintrc.json was read\" : \".eslintrc.json was ignored\",\n  detail: ok\n    ? \"linted the file and reported no-unused-vars, so the config applied\"\n    : (out.match(/ESLint couldn't find[^\\n.]*/)?.[0] ?? out.trim().split(\"\\n\").slice(0, 2).join(\" \")).slice(0, 160),\n  healthy: ok,\n}));\n",
+    "at": "2026-08-30T00:44:39.699Z"
+  }
+]
