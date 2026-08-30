@@ -33,7 +33,7 @@ describe("the source fake", () => {
   });
 
   it("does not let res.sendFile answer for res.send", async () => {
-    const etagNote = (await releases())[0];
+    const etagNote = (await releases("expressjs/express"))[0];
     expect(etagNote).toBeDefined();
     expect(etagNote!.body).toContain("res.sendFile");
     expect(mentions(etagNote!.body, "res.send")).toBe(false);

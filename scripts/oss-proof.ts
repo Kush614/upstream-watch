@@ -137,6 +137,21 @@ function installArgs(pkg: WatchedPackage, version: string): string[] {
   return [`${pkg.package}@${version}`];
 }
 
+/**
+ * Whether a probe says anything about THIS package's watch.
+ *
+ * `agent/probes/express.cjs` exercises `res.send`. Running it for the express *dependency*
+ * — which is watched for `express.json` and `app.get`, and is on a current version — would
+ * produce a "breaks" result about a call that watch does not cover. A reference declares the
+ * symbol it demonstrates, so it always matches itself.
+ */
+export function probeApplies(pkg: WatchedPackage, probeSymbol: string): boolean {
+  if (pkg.role === "reference") return true;
+
+  const watched = pkg.symbols.filter((s) => !pkg.unusedSymbols?.includes(s));
+  return watched.includes(probeSymbol);
+}
+
 export async function proveOne(pkg: WatchedPackage, latest: string): Promise<OssProof> {
   const probePath = fromRepoRoot(`agent/probes/${pkg.package}.cjs`);
   let probeSource: string;
@@ -156,7 +171,8 @@ export async function proveOne(pkg: WatchedPackage, latest: string): Promise<Oss
   return {
     package: pkg.package,
     repo: pkg.repo,
-    symbol: pkg.symbols[0] ?? pkg.package,
+    // The symbol the PROBE exercises, not the first one this package happens to watch.
+    symbol: PROBE_SYMBOL[pkg.package] ?? pkg.symbols[0] ?? pkg.package,
     severity: pkg.severity,
     before,
     after,
@@ -167,6 +183,19 @@ export async function proveOne(pkg: WatchedPackage, latest: string): Promise<Oss
 
 /** Where the UI reads these when nothing is running. Same contract as packages.json. */
 const STORE = "ui/public/oss-proofs.json";
+
+/**
+ * What each probe actually exercises.
+ *
+ * Declared here rather than parsed out of the probe, because the mapping is a claim about
+ * what the proof MEANS, and it should be reviewable in one place next to the check that
+ * uses it.
+ */
+const PROBE_SYMBOL: Record<string, string> = {
+  express: "res.send",
+  "react-dom": "ReactDOM.render",
+  eslint: ".eslintrc",
+};
 
 export async function storeProofs(proofs: OssProof[], file = STORE): Promise<void> {
   await writeFile(fromRepoRoot(file), `${JSON.stringify(proofs, null, 2)}\n`, "utf8");
@@ -195,6 +224,14 @@ async function main(): Promise<void> {
   for (const p of packages) {
     const latest = latestOf.get(p.package);
     if (!latest) throw new ProbeError(`no stored check for ${p.package} — run pnpm oss:check first`, { package: p.package });
+
+    // The probe exercises one symbol. If this package is not watched for that symbol, the
+    // result says nothing about it, and attaching one anyway is a claim about a call the
+    // repo does not make.
+    if (!probeApplies(p, PROBE_SYMBOL[p.package] ?? "")) {
+      console.log(`  ${p.package} ${p.pinned} — no probe covers what this watch is for; skipped`);
+      continue;
+    }
 
     process.stdout.write(`  ${p.package} ${p.pinned} vs ${latest} … `);
     const proof = await proveOne(p, latest);

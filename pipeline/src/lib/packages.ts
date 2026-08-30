@@ -36,6 +36,8 @@ export interface WatchedPackage {
   note?: string;
   /** Symbols declared but not found in `files`. Never silently dropped. */
   unusedSymbols?: string[];
+  /** True when `pinned` came from node_modules; false when it is a range's floor. */
+  versionIsInstalled?: boolean;
 }
 
 function strings(value: unknown, field: string, name: string): string[] {
@@ -45,8 +47,22 @@ function strings(value: unknown, field: string, name: string): string[] {
   return value.map(String);
 }
 
-/** The version actually installed, from the manifest that declares it. */
-async function installedVersion(manifest: string, pkg: string, name: string): Promise<string> {
+/**
+ * The version actually installed.
+ *
+ * Read from `node_modules/<pkg>/package.json`, which is the only place that knows. The
+ * manifest holds a RANGE: `^5.2.1` permits 5.9.x, so taking its floor and calling it
+ * "installed" is a guess that happens to be right until someone runs an update — and then
+ * reports a version nobody has against a break that may not apply.
+ *
+ * With no node_modules we fall back to the range's floor and say so, rather than presenting
+ * a guess as a reading.
+ */
+async function installedVersion(
+  manifest: string,
+  pkg: string,
+  name: string,
+): Promise<{ version: string; fromLockfile: boolean }> {
   let doc: { dependencies?: Record<string, string>; devDependencies?: Record<string, string> };
   try {
     doc = JSON.parse(await readFile(fromRepoRoot(manifest), "utf8")) as typeof doc;
@@ -68,14 +84,26 @@ async function installedVersion(manifest: string, pkg: string, name: string): Pr
     );
   }
 
-  const exact = /(\d+\.\d+\.\d+)/.exec(range)?.[1];
-  if (!exact) {
+  // The installed tree first. Look beside the manifest, then at the workspace root, which
+  // is where a hoisting package manager puts it.
+  const dir = manifest.replace(/package\.json$/, "");
+  for (const candidate of [`${dir}node_modules/${pkg}/package.json`, `node_modules/${pkg}/package.json`]) {
+    try {
+      const installed = JSON.parse(await readFile(fromRepoRoot(candidate), "utf8")) as { version?: string };
+      if (installed.version) return { version: installed.version, fromLockfile: true };
+    } catch {
+      // Not here; try the next place before falling back to the range.
+    }
+  }
+
+  const floor = /(\d+\.\d+\.\d+)/.exec(range)?.[1];
+  if (!floor) {
     throw new ConfigError(`packages.yaml: cannot read a version out of "${pkg}": "${range}" in ${manifest}`, {
       name,
       range,
     });
   }
-  return exact;
+  return { version: floor, fromLockfile: false };
 }
 
 /**
@@ -85,13 +113,19 @@ async function installedVersion(manifest: string, pkg: string, name: string): Pr
  * fabrication as an invented version. Returned rather than thrown, so the caller can say
  * "declared but not used" instead of quietly narrowing the watch.
  */
-async function unusedSymbols(files: string[], symbols: string[]): Promise<string[]> {
+async function unusedSymbols(files: string[], symbols: string[], name: string): Promise<string[]> {
   const sources = await Promise.all(
     files.map(async (f) => {
       try {
         return await readFile(fromRepoRoot(f), "utf8");
-      } catch {
-        return "";
+      } catch (cause) {
+        // Treating an unreadable file as an empty one marks every symbol "unused" and
+        // silently switches the whole watch off. A missing watched file is a config error,
+        // not evidence that the code does not use the symbol.
+        throw new ConfigError(
+          `packages.yaml: "${name}" watches ${f}, which could not be read`,
+          { name, file: f, cause: cause instanceof Error ? cause.message : String(cause) },
+        );
       }
     }),
   );
@@ -124,10 +158,9 @@ export async function loadPackages(file = PACKAGES_FILE): Promise<WatchedPackage
       const files = role === "reference" ? (v.files as string[] | undefined)?.map(String) ?? [] : strings(v.files, "files", name);
       const symbols = strings(v.symbols, "symbols", name);
 
-      const pinned =
-        role === "dependency"
-          ? await installedVersion(String(v.manifest ?? ""), pkg, name)
-          : String(v.pinned ?? "");
+      const resolved =
+        role === "dependency" ? await installedVersion(String(v.manifest ?? ""), pkg, name) : null;
+      const pinned = resolved ? resolved.version : String(v.pinned ?? "");
 
       if (!pinned) throw new ConfigError(`packages.yaml: reference "${name}" must declare a pinned version`, { name });
 
@@ -141,9 +174,12 @@ export async function loadPackages(file = PACKAGES_FILE): Promise<WatchedPackage
         symbols,
         files,
         severity: v.severity === "silent" ? "silent" : "loud",
+        // False when we read the manifest's range instead of the installed tree, so callers
+        // can say "declared" rather than "installed".
+        versionIsInstalled: resolved ? resolved.fromLockfile : undefined,
         note: v.note ? String(v.note) : undefined,
         // Only a dependency can have unused symbols; a reference has no files by design.
-        unusedSymbols: role === "dependency" ? await unusedSymbols(files, symbols) : [],
+        unusedSymbols: role === "dependency" ? await unusedSymbols(files, symbols, name) : [],
       } satisfies WatchedPackage;
     }),
   );

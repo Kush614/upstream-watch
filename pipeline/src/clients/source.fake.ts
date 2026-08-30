@@ -25,11 +25,18 @@ export const NOTES: ReleaseNote[] = [
   },
 ];
 
-export async function releases(): Promise<ReleaseNote[]> {
+/** Same signature as the real client, so a test cannot pass against a shape production lacks. */
+export async function releases(_repo: string, _pages = 4): Promise<ReleaseNote[]> {
   return NOTES;
 }
 
-export async function compare(_repo: string, base: string, head: string, symbols: string[]): Promise<SourceDiff> {
+export async function compare(
+  _repo: string,
+  base: string,
+  head: string,
+  symbols: string[],
+  _pkg = "",
+): Promise<SourceDiff> {
   const hits = symbols.includes("res.send")
     ? [{ file: "lib/response.js", symbol: "res.send", lines: ["-  res.send(404)"], kind: "code" as const }]
     : [];

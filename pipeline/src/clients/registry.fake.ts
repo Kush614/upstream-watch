@@ -16,7 +16,7 @@ const FIXTURES: Record<string, string> = {
   express: "pipeline/test/fixtures/registry-express.json",
 };
 
-export async function versionsOf(name: string): Promise<PackageVersions> {
+export async function versionsOf(name: string, _signal?: AbortSignal): Promise<PackageVersions> {
   const file = FIXTURES[name];
   // An unknown package must fail the way the real client does, not return an empty answer
   // that a caller would read as "no versions published".

@@ -40,3 +40,15 @@ describe("symbol matching", () => {
     expect(mentions("createRootContainer()", "createRoot")).toBe(false);
   });
 });
+
+describe("a symbol is not a substring", () => {
+  it("does not match when an identifier precedes it either", async () => {
+    const { mentions } = await import("../src/clients/source.ts");
+
+    // Checking only the right-hand side let these through.
+    expect(mentions("myres.send(x)", "res.send")).toBe(false);
+    expect(mentions("config.eslintrc", ".eslintrc")).toBe(false);
+    expect(mentions("  res.send(404)", "res.send")).toBe(true);
+    expect(mentions("+ .eslintrc is ignored", ".eslintrc")).toBe(true);
+  });
+});

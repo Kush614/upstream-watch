@@ -672,3 +672,33 @@ infrastructure. Such a run reports `INCONCLUSIVE`, never `BROKE`.
 **Fakes.** Both external clients now ship fixture-backed fakes (CLAUDE.md §7), and the
 fixtures carry the two cases that matter: express's real `5.0.0-beta.1`, so prerelease
 filtering is actually exercised, and a comparison capped at exactly 300 files.
+
+## 2026-08-30 — A range is not a version, and a probe is not universal
+
+**`^5.2.1` is not "5.2.1 is installed".** `installedVersion` took the floor of the manifest's
+range and called it the installed version. It happens to be right in this checkout, and stops
+being right the moment anyone runs an update — at which point the tool reports a version
+nobody has, against a break that may not apply to the version they do. It now reads
+`node_modules/<pkg>/package.json`, which is the only place that knows, and falls back to the
+range only with `versionIsInstalled: false` attached so callers can say "declared" rather
+than "installed".
+
+**A symbol was still a substring on one side.** `mentions()` checked the character after the
+match but not before, so `myres.send` counted as `res.send` and `config.eslintrc` as
+`.eslintrc`. Both ends are checked now.
+
+**A probe does not speak for every watch.** `agent/probes/express.cjs` exercises `res.send`.
+Running it for the express *dependency* — which is watched for `express.json` and `app.get`,
+and is on a current version — produced a "breaks" result about a call that watch does not
+cover. This is the third appearance of the same mistake: first attaching a proof to the
+wrong row by package name, then to the wrong row by version, and now running one at all for
+a watch it says nothing about. A probe now declares which symbol it exercises, and a
+dependency is proved only when that symbol is one it actually uses.
+
+**An unreadable watched file marked every symbol unused.** Which silently switched the whole
+watch off — the config error rendered as "nothing to worry about". It throws now.
+
+**And NOTES.md is a dev artefact.** `appendNote` wrote to a tracked file from any run,
+including a deployed one. That is mutating source as a side effect of an error, in a
+checkout the process does not own. Off under `NODE_ENV=production`, and `UPSTREAM_WATCH_NOTES=0`
+silences it anywhere.

@@ -61,8 +61,12 @@ export function mentions(line: string, symbol: string): boolean {
     if (at < 0) return false;
 
     const next = line[at + symbol.length];
-    // Identifier continuation means this is a longer name, not our symbol.
-    if (next === undefined || !/[A-Za-z0-9_$]/.test(next)) return true;
+    const prev = at > 0 ? line[at - 1] : undefined;
+    // Identifier characters on EITHER side mean this is a longer name, not our symbol.
+    // Checking only the right-hand side let `myres.send` and `xyz.eslintrc` count as hits.
+    const openEnd = next === undefined || !/[A-Za-z0-9_$]/.test(next);
+    const openStart = prev === undefined || !/[A-Za-z0-9_$.]/.test(prev);
+    if (openEnd && openStart) return true;
     from = at + 1;
   }
 }
