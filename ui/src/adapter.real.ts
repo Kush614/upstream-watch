@@ -6,7 +6,7 @@
  * sentences the screen shows, and calls a small local runner for the before/after proof.
  */
 
-import type { Adapter, Phase, RunChunk, RunResult, UiEvent } from "./adapter.ts";
+import type { Adapter, Phase, RunChunk, RunResult, UiEvent, VendorResult, VendorRow } from "./adapter.ts";
 
 /** The proof runner is a separate service; its failures should be distinguishable. */
 export class ProofRunnerError extends Error {
@@ -18,6 +18,7 @@ export class ProofRunnerError extends Error {
   }
 }
 import { loadSession, decide as decideOnApproval } from "./lib/trueforge-events.ts";
+import { askInSession } from "./lib/trueforge-client.ts";
 import type { SessionState } from "./types.ts";
 
 const RUNNER = "/proof";
@@ -217,6 +218,36 @@ class RealAdapter implements Adapter {
       /* nothing has ever been run */
     }
     return {};
+  }
+
+  async listVendors(): Promise<VendorRow[]> {
+    try {
+      const res = await fetch(`${RUNNER}/vendors`);
+      if (res.ok) return ((await res.json()) as { vendors: VendorRow[] }).vendors;
+      throw new ProofRunnerError(`/vendors -> ${res.status} ${res.statusText}`, res.status);
+    } catch (cause) {
+      // The watchlist is a claim about what this repo watches. An empty table would read as
+      // "nothing is watched", which is a different and untrue statement.
+      throw cause instanceof ProofRunnerError
+        ? cause
+        : new ProofRunnerError(`Could not reach the proof runner for the watchlist — ${String(cause)}`);
+    }
+  }
+
+  async checkVendor(vendor: string): Promise<VendorResult> {
+    const res = await fetch(`${RUNNER}/vendors/check?vendor=${encodeURIComponent(vendor)}`, { method: "POST" });
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      throw new ProofRunnerError(body.error ?? `check ${vendor} -> ${res.status}`, res.status);
+    }
+    return ((await res.json()) as { result: VendorResult }).result;
+  }
+
+  async ask(question: string): Promise<string> {
+    if (!this.#sessionId) {
+      throw new ProofRunnerError("No agent session to ask — start a watch first, or reload once one is running");
+    }
+    return askInSession(this.#sessionId, question);
   }
 }
 

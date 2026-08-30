@@ -47,13 +47,50 @@ export interface RunResult {
   status: number;
   responseExcerpt: string;
   tests: { passed: number; failed: number; output: string };
+  citations: Citation[];
+  at: string;
+}
+
+/**
+ * A claim on screen, and the thing that backs it.
+ *
+ * The columns assert something consequential — that your service breaks, that this fix
+ * repairs it. A reader who cannot check that is being asked to take it on faith, which is
+ * the opposite of the point. Every citation is read back from real evidence.
+ */
+export interface Citation {
+  claim: string;
+  evidence: string;
+  source: string;
+  url?: string;
+}
+
+/** One vendor on the watchlist, and what the last look at it found. */
+export interface VendorRow {
+  vendor: string;
+  url: string;
+  source: "live" | "cache";
+  pinnedBecause?: string;
+  symbols: string[];
+  files: string[];
+  lastCheck: string | null;
+  entriesSeen: number;
+  result?: VendorResult;
+}
+
+export interface VendorResult {
+  entries: number;
+  matches: Array<{ date: string; title: string; url: string; relevance: string; files: string[] }>;
+  breakingElsewhere: number;
+  failed?: string;
   at: string;
 }
 
 export type RunChunk =
   | { phase: "request"; data: unknown }
   | { phase: "response"; data: { status: number; excerpt: string } }
-  | { phase: "tests"; data: { passed: number; failed: number; output: string } };
+  | { phase: "tests"; data: { passed: number; failed: number; output: string } }
+  | { phase: "citations"; data: Citation[] };
 
 export interface Adapter {
   subscribe(cb: (e: UiEvent) => void): () => void;
@@ -62,6 +99,14 @@ export interface Adapter {
   reject(approvalId: string, reason: string): Promise<void>;
   run(side: "before" | "after"): Promise<AsyncIterable<RunChunk>>;
   loadLastRun(): Promise<{ before?: RunResult; after?: RunResult }>;
+
+  /** Everything this repo watches, not just the vendor the columns happen to be about. */
+  listVendors(): Promise<VendorRow[]>;
+  /** Check one vendor for real. Never consumes state the agent still has to find. */
+  checkVendor(vendor: string): Promise<VendorResult>;
+
+  /** Ask the running agent a question, in its own session. */
+  ask(question: string): Promise<string>;
 }
 
 /* ────────────────────────── shared helpers ─────────────────────────────── */

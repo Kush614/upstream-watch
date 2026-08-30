@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { currentPhase, mergedDetail, type Adapter, type Phase, type RunResult, type UiEvent } from "./adapter.ts";
+import { currentPhase, mergedDetail, type Adapter, type Phase, type RunResult, type UiEvent, type VendorRow } from "./adapter.ts";
 import { mockAdapter } from "./adapter.mock.ts";
 import { realAdapter } from "./adapter.real.ts";
 import { HEADLINES, fill } from "./copy.ts";
@@ -8,6 +8,8 @@ import { Headline } from "./components/Headline.tsx";
 import { ProofColumn } from "./components/ProofColumn.tsx";
 import { NeedsYou } from "./components/NeedsYou.tsx";
 import { Receipts } from "./components/Receipts.tsx";
+import { Watchlist } from "./components/Watchlist.tsx";
+import { Studio } from "./components/Studio.tsx";
 import { useSound } from "./lib/useSound.ts";
 
 const params = new URLSearchParams(window.location.search);
@@ -21,6 +23,7 @@ export function App() {
   const [running, setRunning] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [vendors, setVendors] = useState<VendorRow[]>([]);
   const [sound, setSound] = useState(false);
   const play = useSound(sound);
   const lastPhase = useRef<Phase>("idle");
@@ -33,6 +36,13 @@ export function App() {
       setBefore(last.before);
       setAfter(last.after);
     })();
+
+    // The watchlist is a separate claim with a separate failure mode: if the runner is
+    // down, an empty table would read as "nothing is watched", so say why instead.
+    void adapter
+      .listVendors()
+      .then(setVendors)
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)));
 
     return adapter.subscribe((e) => setEvents((prev) => [...prev, e]));
   }, []);
@@ -140,6 +150,10 @@ export function App() {
           <ProofColumn label="before" result={before} running={running} />
           <ProofColumn label="after" result={after} running={running} />
         </div>
+
+        <Watchlist rows={vendors} onCheck={(v) => adapter.checkVendor(v)} />
+
+        <Studio ask={(q) => adapter.ask(q)} sessionKnown={events.length > 0} />
 
         {phase === "awaiting_approval" && detail.approvalId && (
           <NeedsYou

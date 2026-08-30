@@ -139,3 +139,36 @@ describe("regressions the review caught", () => {
     expect(toUiEventForTest(state).phase).toBe("merged");
   });
 });
+
+describe("Watchlist and citations", () => {
+  it("lists every vendor, with Stripe's pin explained rather than hidden", async () => {
+    const rows = await new MockAdapter().listVendors();
+
+    expect(rows.map((r) => r.vendor).sort()).toEqual(["cloudflare", "openai", "slack", "stripe"]);
+
+    // A cached vendor sitting silently next to live ones would overstate the coverage.
+    const stripe = rows.find((r) => r.vendor === "stripe");
+    expect(stripe?.source).toBe("cache");
+    expect(stripe?.pinnedBecause).toMatch(/policy_20050/);
+  });
+
+  it("cites the vendor's own page, the commit, the reply and the tests", async () => {
+    const a = new MockAdapter();
+    a.reset();
+    for (let i = 0; i < 4; i++) a.advance();
+
+    const { before } = await a.loadLastRun();
+    expect(before?.citations).toHaveLength(4);
+
+    // The chain has to reach OpenAI's page: a claim about a deprecation whose only source
+    // is this UI is not evidence of anything.
+    expect(before?.citations.some((c) => c.url?.includes("platform.openai.com"))).toBe(true);
+    expect(before?.citations.every((c) => c.claim && c.evidence && c.source)).toBe(true);
+  });
+
+  it("refuses to answer in the agent's voice when there is no agent", async () => {
+    // The offline mock must not invent a reply — that is the one thing this UI cannot do.
+    const answer = await new MockAdapter().ask("why did you change this?");
+    expect(answer).toMatch(/not running|cannot ask/i);
+  });
+});
