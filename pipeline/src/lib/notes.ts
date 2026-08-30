@@ -16,7 +16,13 @@ import { fromRepoRoot } from "./paths.ts";
 function notesEnabled(): boolean {
   const explicit = process.env.UPSTREAM_WATCH_NOTES;
   if (explicit !== undefined) return explicit !== "0" && explicit !== "false";
-  return process.env.NODE_ENV !== "production";
+
+  // Opt IN, not opt out. "NODE_ENV is not production" also covers CI, a test run, a
+  // container with no NODE_ENV at all, and anywhere someone deployed without setting it —
+  // none of which should be appending to a tracked file in a checkout they do not own.
+  const env = process.env.NODE_ENV;
+  if (process.env.CI === "true" || process.env.VITEST) return false;
+  return env === "development" || env === undefined && process.env.UPSTREAM_WATCH_DEV === "1";
 }
 
 export async function appendNote(note: {

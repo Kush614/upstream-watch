@@ -702,3 +702,28 @@ watch off — the config error rendered as "nothing to worry about". It throws n
 including a deployed one. That is mutating source as a side effect of an error, in a
 checkout the process does not own. Off under `NODE_ENV=production`, and `UPSTREAM_WATCH_NOTES=0`
 silences it anywhere.
+
+## 2026-08-30 — "Not production" is not "development"
+
+`notesEnabled()` returned true whenever `NODE_ENV !== "production"`. That also covers CI, a
+test run, a container with no `NODE_ENV` set at all, and anywhere someone deployed without
+setting it — all of which would have been appending to a tracked file in a checkout the
+process does not own. It is opt-IN now: `NODE_ENV=development`, or `UPSTREAM_WATCH_DEV=1`,
+and never under `CI` or `VITEST`.
+
+**Version provenance was computed and then dropped.** `installedVersion` knows whether it
+read `node_modules` or fell back to the manifest's range, and the finding threw that away —
+making a guess indistinguishable from a reading on screen, which is the one difference a
+person needs to judge whether a finding applies to them. The CLI now prints
+`(declared, not installed)` when it is a guess.
+
+**Two watches, one key.** `express` appears twice — a current dependency and a 4→5
+reference — and the proof runner keyed its targets by package name, so one entry's target
+was handed to the other. Keyed by `role:package` now. This is the fourth time the same
+collision has appeared: in node ids, in proof attachment by version, in proof attachment by
+symbol, and now in target lookup. Two things that share a name are not the same thing, and
+this repo keeps learning it one map at a time.
+
+**A reference gathers notes past the version it names.** It documents one step —
+`4.19.2 → 5.2.1` — and collecting release notes from majors above that attributes later
+changes to a comparison that never covered them.

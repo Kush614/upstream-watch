@@ -26,6 +26,13 @@ export interface PackageFinding {
   note?: string;
   /** Declared symbols that appear in none of the declared files. */
   unusedSymbols?: string[];
+  /**
+   * False when `pinned` is the floor of a manifest range rather than what is installed.
+   *
+   * Dropping this made a guess indistinguishable from a reading on screen — the one
+   * difference a person needs to judge whether the finding applies to them.
+   */
+  versionIsInstalled?: boolean;
   repo: string;
   pinned: string;
   latest: string;
@@ -62,6 +69,7 @@ export async function checkPackage(p: WatchedPackage): Promise<PackageFinding> {
     role: p.role,
     note: p.note,
     unusedSymbols: p.unusedSymbols?.length ? p.unusedSymbols : undefined,
+    versionIsInstalled: p.versionIsInstalled,
     repo: p.repo,
     pinned: p.pinned,
     latest: target,
@@ -87,9 +95,13 @@ export async function checkPackage(p: WatchedPackage): Promise<PackageFinding> {
   const used = p.symbols.filter((s) => !p.unusedSymbols?.includes(s));
   if (used.length === 0) return finding;
 
+  const ceiling = majorOf(target);
   for (const note of await releases(p.repo, 4)) {
     const major = majorOf(note.tag.replace(/^v/, ""));
     if (major === null || major <= (majorOf(p.pinned) ?? 0)) continue;
+    // A reference documents one step. Gathering notes from majors ABOVE the version it
+    // names attributes later changes to a comparison that never covered them.
+    if (ceiling !== null && major > ceiling) continue;
 
     for (const symbol of used) {
       const line = note.body.split("\n").find((l) => mentions(l, symbol));
@@ -128,7 +140,9 @@ function render(f: PackageFinding): void {
 
   const behind = f.majorsBehind === 0 ? "up to date" : `${f.majorsBehind} major${f.majorsBehind > 1 ? "s" : ""} behind`;
   const tag = f.role === "reference" ? "  [reference — not this repo]" : "";
-  console.log(`\n  ${f.package}  ${f.pinned} → ${f.latest}   ${behind}${tag}`);
+  // "declared" and "installed" are different claims, and only one of them is a measurement.
+  const how = f.role === "dependency" && f.versionIsInstalled === false ? " (declared, not installed)" : "";
+  console.log(`\n  ${f.package}  ${f.pinned}${how} → ${f.latest}   ${behind}${tag}`);
 
   if (f.unusedSymbols?.length) {
     // Watching a symbol nobody calls manufactures a finding about code that does not exist.

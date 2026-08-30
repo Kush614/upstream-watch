@@ -218,11 +218,13 @@ async function main(): Promise<void> {
   const stored = JSON.parse(await readFile(fromRepoRoot("ui/public/packages.json"), "utf8")) as Array<{
     findings: Array<{ package: string; latest: string }>;
   }>;
-  const latestOf = new Map(stored[0]?.findings.map((f) => [f.package, f.latest]) ?? []);
+  // Keyed by the WATCH, not the package. express appears twice — a current dependency and
+  // a 4-to-5 reference — and one key for both hands the reference the dependency's target.
+  const latestOf = new Map(stored[0]?.findings.map((f) => [`${f.role}:${f.package}`, f.latest]) ?? []);
 
   const proofs: OssProof[] = [];
   for (const p of packages) {
-    const latest = latestOf.get(p.package);
+    const latest = p.against ?? latestOf.get(`${p.role}:${p.package}`);
     if (!latest) throw new ProbeError(`no stored check for ${p.package} — run pnpm oss:check first`, { package: p.package });
 
     // The probe exercises one symbol. If this package is not watched for that symbol, the
