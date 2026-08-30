@@ -67,9 +67,16 @@ export function staleness(
   versions: PackageVersions,
   pinned: string,
   now = new Date(),
-): { majorsBehind: number; daysSincePinned: number | null; nextMajor: Release | null } {
+): { majorsBehind: number; daysSincePinned: number | null; nextMajor: Release | null; unparseablePin?: string } {
   const pinnedMajor = majorOf(pinned);
   const latestMajor = majorOf(versions.latest);
+
+  // "^4.19.2", "latest", a git URL — anything majorOf cannot read used to fall through to
+  // majorsBehind: 0, which renders as "up to date". A pin we cannot understand is the one
+  // case where we know the least, so it must never produce the most reassuring answer.
+  if (pinnedMajor === null || latestMajor === null) {
+    return { majorsBehind: 0, daysSincePinned: null, nextMajor: null, unparseablePin: pinned };
+  }
 
   const pinnedRelease = versions.releases.find((r) => r.version === pinned) ?? null;
   const daysSincePinned = pinnedRelease
@@ -78,14 +85,7 @@ export function staleness(
 
   // The first release of the first major above the pin: the moment the break became
   // available to anyone who ran `npm update`.
-  const nextMajor =
-    pinnedMajor === null
-      ? null
-      : versions.releases.find((r) => (majorOf(r.version) ?? 0) === pinnedMajor + 1) ?? null;
+  const nextMajor = versions.releases.find((r) => (majorOf(r.version) ?? 0) === pinnedMajor + 1) ?? null;
 
-  return {
-    majorsBehind: pinnedMajor === null || latestMajor === null ? 0 : Math.max(0, latestMajor - pinnedMajor),
-    daysSincePinned,
-    nextMajor,
-  };
+  return { majorsBehind: Math.max(0, latestMajor - pinnedMajor), daysSincePinned, nextMajor };
 }

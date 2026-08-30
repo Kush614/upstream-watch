@@ -43,3 +43,15 @@ describe("staleness", () => {
     expect(s.daysSincePinned).toBeNull();
   });
 });
+
+describe("what the review caught", () => {
+  it("never reports an unparseable pin as up to date", async () => {
+    // "^4.19.2", "latest", a git URL — anything majorOf cannot read used to fall through
+    // to majorsBehind: 0, which renders as the most reassuring answer available in the
+    // one case where we know the least.
+    const s = staleness(EXPRESS, "^4.19.2");
+
+    expect(s.unparseablePin).toBe("^4.19.2");
+    expect(s.nextMajor).toBeNull();
+  });
+});

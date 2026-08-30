@@ -30,6 +30,13 @@ export interface SourceDiff {
   commits: number;
   filesChanged: number;
   /**
+   * GitHub's compare endpoint returns at most 300 files.
+   *
+   * When it does, files beyond the cap were never examined — so "no changes to anything you
+   * call" is not a finding, it is the absence of one. Every caller must say which it has.
+   */
+  truncated: boolean;
+  /**
    * Files whose patch mentions a symbol we use.
    *
    * Split by kind, because they are not equal evidence. A hit in `lib/response.js` is the
@@ -55,13 +62,23 @@ async function gh<T>(args: string[], what: string): Promise<T> {
   }
 }
 
-export async function releases(repo: string, limit = 10): Promise<ReleaseNote[]> {
+/**
+ * Release notes, following pagination.
+ *
+ * A fixed `per_page` quietly answers "were we told about this?" with "we did not look far
+ * enough". `--paginate` walks the pages; `--slurp` merges them into one array.
+ */
+export async function releases(repo: string, pages = 4): Promise<ReleaseNote[]> {
   const raw = await gh<Array<{ tag_name: string; published_at: string; name: string; body: string; html_url: string }>>(
-    ["api", `repos/${repo}/releases?per_page=${limit}`],
+    // --slurp merges the pages into one array; it cannot be combined with --jq, so the
+    // page cap is applied here instead.
+    ["api", "--paginate", "--slurp", `repos/${repo}/releases?per_page=100`],
     `reading releases for ${repo}`,
   );
 
-  return raw.map((r) => ({
+  const capped = raw.flat().slice(0, pages * 100);
+
+  return capped.map((r) => ({
     tag: r.tag_name,
     published: r.published_at,
     title: r.name || r.tag_name,
@@ -136,6 +153,8 @@ export async function compare(
     head,
     commits: raw.total_commits,
     filesChanged: files.length,
+    // 300 is the documented ceiling. Hitting it exactly is the tell.
+    truncated: files.length >= 300,
     hits,
     url: raw.html_url,
   };
