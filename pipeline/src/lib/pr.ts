@@ -1,5 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { fromRepoRoot } from "./paths.ts";
+import { classify } from "./severity.ts";
+import { severityLine, verification, provenance as provenanceLine } from "./pr-body-fields.ts";
 import type { ChangeEvent, ChangelogEntry, Provenance } from "../types.ts";
 
 /** Prompts live in files, never inline strings (CLAUDE.md §7). */
@@ -13,6 +15,23 @@ export interface PatchResult {
   rationale: string;
   iterations: number;
   reason?: string;
+}
+
+/**
+ * vitest's own summary, when it printed one.
+ *
+ * Anchored on the "Tests" line: a bare /(\d+) passed/ matches "Test Files 3 passed" first
+ * and reports the file count. Returns undefined rather than zeroes when there is no summary
+ * at all — a run we could not measure is not a run that passed nothing.
+ */
+export function countsFrom(output: string): { passed: number; failed: number } | undefined {
+  const line = /^\s*Tests\s+(.+)$/m.exec(output.replace(/\u001b\[[0-9;]*m/g, ""))?.[1];
+  if (!line) return undefined;
+
+  return {
+    passed: Number(/(\d+) passed/.exec(line)?.[1] ?? 0),
+    failed: Number(/(\d+) failed/.exec(line)?.[1] ?? 0),
+  };
 }
 
 export interface PrContent {
@@ -70,12 +89,39 @@ export async function buildPr(input: {
   patch: PatchResult;
   provenance: Provenance;
   templateFile?: string;
+  /** What the OLD code got from the real upstream, when a proof ran. */
+  before?: { version: string; observed: string };
+  /** What the NEW code gets from the same real upstream. */
+  after?: { version: string; observed: string };
+  /** Why this vendor is cached, when it is. */
+  provenanceWhy?: string;
+  /** The commit this PR is built on. */
+  sha?: string;
 }): Promise<PrContent> {
   const { event, patch, provenance } = input;
   const entry: ChangelogEntry = event.entry;
   const template = await readFile(fromRepoRoot(input.templateFile ?? TEMPLATE), "utf8");
 
+  // The verdict leads the PR. "Breaking now" and "FYI" are different asks of a reviewer,
+  // and they should know which one this is before reading anything else.
+  const verdict = classify({
+    touchesUs: event.relevance === "symbol-match",
+    breaking: event.breaking,
+    shutdown: entry.date,
+    symbol: event.symbols[0],
+    vendor: entry.vendor,
+  });
+
   const body = fill(template, {
+    severityLine: severityLine(verdict),
+    because: inline(verdict.because, 300),
+    verification: verification({
+      before: input.before,
+      after: input.after,
+      counts: countsFrom(patch.testOutput),
+      passed: patch.passed,
+    }),
+    provenance: provenanceLine(entry.vendor, provenance === "live" ? "live" : "cache", input.provenanceWhy),
     vendor: inline(entry.vendor, 40),
     "entry.date": inline(entry.date, 20),
     // Title and body are BOTH vendor-controlled. Rendering the title as a bare heading let
@@ -92,10 +138,13 @@ export async function buildPr(input: {
     ``,
     `---`,
     ``,
-    `Scraped ${provenance === "live" ? "live via Bright Data" : "from cache (DEMO_MODE)"} · ` +
+    `Scraped ${provenance === "live" ? "live via Bright Data" : "from a committed capture"} · ` +
       `${event.breaking ? "vendor-flagged breaking" : "matched a watched symbol"}` +
       (event.symbols.length ? ` · symbols: ${event.symbols.map((s) => `\`${s}\``).join(", ")}` : ``),
     patch.passed ? `` : `\n⚠️ **Tests did not pass** after ${patch.iterations} iteration(s). Opened as a draft; no approval requested.`,
+    ``,
+    `Opened by Upstream Watch · merge requires approval in the TrueForge session` +
+      (input.sha ? ` · \`${inline(input.sha, 12)}\`` : ``),
   ].join("\n");
 
   return {

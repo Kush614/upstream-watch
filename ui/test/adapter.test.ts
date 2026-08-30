@@ -263,3 +263,39 @@ describe("a proof must exercise something this repo calls", () => {
     expect(findNode(tree, "pkg:reference:react-dom")?.children?.some((c) => c.id.endsWith(":proof"))).toBe(true);
   });
 });
+
+describe("severity and the timeline", () => {
+  it("says a passed shutdown already happened, in the past tense", async () => {
+    const a = new MockAdapter();
+    a.reset();
+    for (let i = 0; i < 3; i++) a.advance();
+
+    const { detail } = (await a.history()).at(-1)!;
+    expect(detail?.severity).toBe("breaks");
+    expect(detail?.alreadyPast).toBe(true);
+    // A warning about something that already broke is not a warning.
+    expect(detail?.because).toMatch(/already happened/);
+  });
+
+  it("counts one entry per vendor, not one per event", async () => {
+    const { countsLine } = await import("../src/lib/severity.ts");
+    const a = new MockAdapter();
+    a.reset();
+    for (let i = 0; i < 6; i++) a.advance();
+
+    // The same change arrives on every poll as the run progresses; counting each arrival
+    // turns one problem into a crowd.
+    expect(countsLine(await a.history())).toBe("1 breaking now");
+  });
+
+  it("reports the gap as exposure when the fix landed after the shutdown", async () => {
+    const a = new MockAdapter();
+    a.reset();
+    for (let i = 0; i < 3; i++) a.advance();
+
+    const t = (await a.history()).at(-1)!.detail!.timeline!;
+    // merged 2026-08-30, shutdown 2026-07-23 — "38 days early" would be a lie in the
+    // most flattering possible direction.
+    expect(t.shutdown! < t.merged!).toBe(true);
+  });
+});

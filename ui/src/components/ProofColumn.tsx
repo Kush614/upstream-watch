@@ -1,28 +1,24 @@
 import { useState } from "react";
 import type { RunResult } from "../adapter.ts";
 import { Citations } from "./Citations.tsx";
+import { RequestDiff } from "./RequestDiff.tsx";
 
-/** Highlight the one key the vendor removed, so the difference is visible at a glance. */
-function RequestBody({ request, changedKey }: { request: unknown; changedKey?: string }) {
-  const text = JSON.stringify(request ?? {}, null, 2);
 
-  return (
-    <pre className="overflow-x-auto rounded-lg border border-line bg-[var(--bg)] p-3 font-mono text-[12px] leading-relaxed">
-      {text.split("\n").map((line, i) => {
-        const hit = changedKey && line.includes(`"${changedKey}"`);
-        return (
-          <span key={i} className={hit ? "block rounded bg-[var(--state)]/15 px-1 text-ink" : "block text-dim"}>
-            {line}
-          </span>
-        );
-      })}
-    </pre>
-  );
+/**
+ * The receipt records the whole exchange; the panel wants the body that was sent.
+ *
+ * Falls back to the receipt itself for older stored runs, which recorded the body directly.
+ */
+function requestBody(request: unknown): unknown {
+  if (request && typeof request === "object" && "body" in request) {
+    return (request as { body: unknown }).body;
+  }
+  return request;
 }
 
 /**
  * One side of the proof. Identical component for both columns — the only difference is the
- * commit it ran and whether the emulated vendor accepted it.
+ * commit it ran and what the live upstream said back.
  */
 export function ProofColumn({ label, result, running }: {
   label: "before" | "after";
@@ -47,7 +43,7 @@ export function ProofColumn({ label, result, running }: {
 
       {result && (
         <>
-          <RequestBody request={result.request} changedKey={result.changedKey} />
+          <RequestDiff body={requestBody(result.request)} changedKey={result.changedKey} side={label} />
 
           <div className="mt-3 flex items-start gap-2.5">
             <span

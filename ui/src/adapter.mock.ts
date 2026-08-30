@@ -9,7 +9,7 @@
  * same thing and cannot drift apart.
  */
 
-import { WatchlistError, type Adapter, type Citation, type OssProof, type PackageFinding, type RunChunk, type RunResult, type UiEvent, type VendorResult, type VendorRow } from "./adapter.ts";
+import { WatchlistError, type Adapter, type Citation, type Captures, type OssProof, type PackageFinding, type RunChunk, type RunResult, type UiEvent, type VendorResult, type VendorRow } from "./adapter.ts";
 
 const VENDOR = "openai";
 const SHUTDOWN = "2026-07-23";
@@ -21,6 +21,28 @@ const CHANGELOG = {
   excerpt: "July 23, 2026 `gpt-5.1-codex-mini` \u2192 `gpt-5.6-terra`",
   url: "https://platform.openai.com/docs/deprecations",
   sentence: "`" + OLD_MODEL + "` was shut down on " + SHUTDOWN + ".",
+};
+
+/**
+ * The verdict and the dates, from the run this mock replays.
+ *
+ * gpt-5.1-codex-mini was shut down on 2026-07-23 and PR #13 merged on 2026-08-30 — so the
+ * honest number here is not "days early". It is 38 days during which the service was
+ * already broken and nothing said so, which is the argument for the product.
+ */
+const VERDICT = {
+  severity: "breaks" as const,
+  alreadyPast: true,
+  symbol: OLD_MODEL,
+  because: "`" + OLD_MODEL + "` stopped working on " + SHUTDOWN + ". This is not a warning — it already happened.",
+};
+
+const DATES = {
+  announced: SHUTDOWN,
+  detected: "2026-08-29",
+  fixed: "2026-08-30",
+  merged: "2026-08-30",
+  shutdown: SHUTDOWN,
 };
 
 const DIFF = "diff --git a/demo-app/src/risk.ts b/demo-app/src/risk.ts\nindex 050d969..00525b1 100644\n--- a/demo-app/src/risk.ts\n+++ b/demo-app/src/risk.ts\n@@ -9,7 +9,7 @@\n const OPENAI_API = process.env.OPENAI_API_BASE ?? \"https://api.openai.com/v1\";\n \n /** Pinned deliberately. OpenAI's deprecations page lists a shutdown date for this. */\n-export const RISK_MODEL = \"gpt-5-mini-2025-08-07\";\n+export const RISK_MODEL = \"gpt-5.6-terra\";\n \n export interface RiskRequest {\n   amountCents: number;\ndiff --git a/demo-app/test/vendors.test.ts b/demo-app/test/vendors.test.ts\nindex 330ec35..b3eeb17 100644\n--- a/demo-app/test/vendors.test.ts\n+++ b/demo-app/test/vendors.test.ts\n@@ -6,7 +6,7 @@ describe(\"OpenAI risk check\", () => {\n   it(\"uses the model this service is pinned to\", () => {\n     // Pinned deliberately: OpenAI publishes a shutdown date for this model, so when the\n     // deprecation lands this assertion is what has to change alongside the call.\n-    expect(RISK_MODEL).toBe(\"gpt-5-mini-2025-08-07\");\n+    expect(RISK_MODEL).toBe(\"gpt-5.6-terra\");\n   });\n \n   it(\"builds a prompt carrying the facts a reviewer needs\", () => {\n";
@@ -39,20 +61,20 @@ export const TIMELINE: UiEvent[] = [
     phase: "change_found",
     message: VENDOR + " is retiring something your checkout uses on " + SHUTDOWN + ".",
     at: "",
-    detail: { vendor: VENDOR, shutdownDate: SHUTDOWN, changelog: CHANGELOG, files: FILES },
+    detail: { vendor: VENDOR, shutdownDate: SHUTDOWN, changelog: CHANGELOG, files: FILES, ...VERDICT, timeline: DATES },
   },
   {
     phase: "testing",
     message: "Trying your current code against how " + VENDOR + " will behave that day.",
     at: "",
-    detail: { vendor: VENDOR, shutdownDate: SHUTDOWN, changelog: CHANGELOG, files: FILES },
+    detail: { vendor: VENDOR, shutdownDate: SHUTDOWN, changelog: CHANGELOG, files: FILES, ...VERDICT, timeline: DATES },
   },
   {
     phase: "awaiting_approval",
     message: "I prepared a fix and tested it. It needs your say-so.",
     at: "",
     detail: {
-      vendor: VENDOR, shutdownDate: SHUTDOWN, changelog: CHANGELOG, files: FILES,
+      vendor: VENDOR, shutdownDate: SHUTDOWN, changelog: CHANGELOG, files: FILES, ...VERDICT, timeline: DATES,
       diff: DIFF, tests: { passed: 12, failed: 0, output: TEST_OUTPUT },
       pr: PR, approvalId: "mock-approval-1",
     },
@@ -62,7 +84,7 @@ export const TIMELINE: UiEvent[] = [
     message: "Fix applied. Your checkout will keep working on " + SHUTDOWN + ".",
     at: "",
     detail: {
-      vendor: VENDOR, shutdownDate: SHUTDOWN, changelog: CHANGELOG, files: FILES,
+      vendor: VENDOR, shutdownDate: SHUTDOWN, changelog: CHANGELOG, files: FILES, ...VERDICT, timeline: DATES,
       diff: DIFF, tests: { passed: 12, failed: 0, output: TEST_OUTPUT }, pr: PR,
       review: { url: PR.url + "#pullrequestreview" },
       commit: { sha: AFTER_SHA, url: "https://github.com/Kush614/upstream-watch/commit/" + AFTER_SHA },
@@ -536,6 +558,12 @@ export class MockAdapter implements Adapter {
 
   async listOssProofs(): Promise<OssProof[]> {
     return OSS_PROOFS;
+  }
+
+  async listCaptures(vendor: string): Promise<Captures> {
+    // The real captures of OpenAI's page are byte-identical: their layout has not moved.
+    // Inventing a difference here is exactly what PageDiff refuses to render.
+    return { vendor, differ: false };
   }
 
   hasLiveSession(): boolean {

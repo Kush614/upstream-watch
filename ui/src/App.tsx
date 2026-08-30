@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { currentPhase, mergedDetail, type Adapter, type Phase, type RunResult, type UiEvent, type VendorRow, type PackageFinding, type OssProof } from "./adapter.ts";
+import { currentPhase, mergedDetail, type Adapter, type Phase, type RunResult, type UiEvent, type VendorRow, type PackageFinding, type OssProof, type Captures } from "./adapter.ts";
 import { mockAdapter } from "./adapter.mock.ts";
 import { realAdapter } from "./adapter.real.ts";
 import { HEADLINES, fill } from "./copy.ts";
 import { StatusHeader } from "./components/StatusHeader.tsx";
+import { VendorTimeline } from "./components/VendorTimeline.tsx";
+import { PageDiff } from "./components/PageDiff.tsx";
+import { countsLine } from "./lib/severity.ts";
 import { Headline } from "./components/Headline.tsx";
 import { ProofColumn } from "./components/ProofColumn.tsx";
 import { NeedsYou } from "./components/NeedsYou.tsx";
@@ -28,6 +31,7 @@ export function App() {
   const [packages, setPackages] = useState<PackageFinding[]>([]);
   const [ossProofs, setOssProofs] = useState<OssProof[]>([]);
   const [upstreamProblem, setUpstreamProblem] = useState<string>();
+  const [captures, setCaptures] = useState<Captures>();
   const [sound, setSound] = useState(false);
   const play = useSound(sound);
   const lastPhase = useRef<Phase>("idle");
@@ -47,12 +51,16 @@ export function App() {
     void adapter.listVendors().then(setVendors).catch(surface);
     void adapter.listPackages().then(setPackages).catch(surface);
     void adapter.listOssProofs().then(setOssProofs).catch(surface);
+    // Captures are per vendor and only interesting when the page moved; a failure here is
+    // not worth an alert, because the absence of a redesign is the normal case.
+    void adapter.listCaptures("openai").then(setCaptures).catch(() => undefined);
 
     return adapter.subscribe((e) => setEvents((prev) => [...prev, e]));
   }, []);
 
   const phase = currentPhase(events);
   const detail = useMemo(() => mergedDetail(events), [events]);
+  const counts = useMemo(() => countsLine(events), [events]);
 
   // One chord when the problem appears, one when it is gone.
   useEffect(() => {
@@ -122,7 +130,7 @@ export function App() {
           <h2 className="text-[15px] font-semibold">Upstream Watch</h2>
           <p className="text-[13px] text-dim">{events.at(-1)?.message ?? "Starting up…"}</p>
         </div>
-        <StatusHeader phase={phase} shutdownDate={shutdown} />
+        <StatusHeader phase={phase} shutdownDate={shutdown} counts={counts} />
       </header>
 
       <div className="grid gap-5">
@@ -168,6 +176,19 @@ export function App() {
             onApprove={() => void decide("approve")}
             onReject={(reason) => void decide("reject", reason)}
           />
+        )}
+
+        {captures?.differ && (
+          <section className="grid gap-2 rounded-xl border border-line bg-panel p-4">
+            <h2 className="text-[15px] font-semibold">Their page changed</h2>
+            <PageDiff captures={captures} runner="/proof" />
+          </section>
+        )}
+
+        {detail.timeline && (
+          <section className="rounded-xl border border-line bg-panel px-4 py-3.5">
+            <VendorTimeline timeline={detail.timeline} vendor={detail.vendor} />
+          </section>
         )}
 
         <Receipts detail={detail} />

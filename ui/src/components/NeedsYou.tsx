@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { FixStepper } from "./FixStepper.tsx";
+import { SeverityBadge } from "./SeverityBadge.tsx";
 import type { UiEvent } from "../adapter.ts";
 
 /**
@@ -22,9 +24,28 @@ export function NeedsYou({ detail, onApprove, onReject, busy }: {
 
   return (
     <section className="animate-slideIn rounded-xl border border-accent/60 bg-panel p-5 sm:p-6">
+      <div className="mb-2 flex flex-wrap items-center gap-2">
+        {detail.severity && (
+          <SeverityBadge
+            severity={detail.severity}
+            shutdown={detail.shutdownDate}
+            alreadyPast={detail.alreadyPast}
+            title={detail.because}
+          />
+        )}
+      </div>
+
       <p className="text-[17px] leading-relaxed">
-        <span className="font-semibold capitalize">{vendor}</span> is removing something your app
-        uses. I prepared a fix and {tests && tests.failed > 0 ? "some checks did not pass" : "tested it"}.
+        {/* The classifier's sentence, not one written here. It already knows whether the
+            date has passed, which changes the tense and the whole meaning of the card. */}
+        {detail.because ? (
+          <span className="font-medium">{detail.because}</span>
+        ) : (
+          <>
+            <span className="font-semibold capitalize">{vendor}</span> is removing something your app uses.
+          </>
+        )}{" "}
+        I prepared a fix and {tests && tests.failed > 0 ? "some checks did not pass" : "tested it"}.
         {tests && (
           /* Colour follows the result. A green tick over a failing run, directly above the
              only irreversible button on the page, is the worst thing this card could do. */
@@ -37,6 +58,8 @@ export function NeedsYou({ detail, onApprove, onReject, busy }: {
           </span>
         )}
       </p>
+
+      <FixStepper detail={detail} />
 
       <div className="mt-5 flex flex-wrap items-center gap-2.5">
         {rejecting ? (

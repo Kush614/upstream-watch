@@ -7,6 +7,18 @@
  * built and rehearsed with no backend running.
  */
 
+/** How much attention a change deserves. Mirrors pipeline/src/lib/severity.ts. */
+export type Severity = "breaks" | "behaviour" | "fyi";
+
+/** When each thing happened, so the gap between fixed and shutdown can be shown honestly. */
+export interface Timeline {
+  announced?: string;
+  detected?: string;
+  fixed?: string;
+  merged?: string;
+  shutdown?: string;
+}
+
 export type Phase =
   | "idle"
   | "watching"
@@ -32,9 +44,18 @@ export interface UiEvent {
     files?: string[];
     tests?: { passed: number; failed: number; output?: string };
     pr?: { url: string; number: number };
-    review?: { url: string };
+    review?: { url: string; findings?: Array<{ title: string; status: "resolved" | "dismissed" | "open" }> };
     commit?: { sha: string; url: string };
     approvalId?: string;
+    /** How much attention this needs. Absent means we have not classified it yet. */
+    severity?: Severity;
+    /** One plain sentence, from the classifier — never written in the component. */
+    because?: string;
+    /** True when the shutdown date is behind us: not a warning, a diagnosis. */
+    alreadyPast?: boolean;
+    /** The symbol that matched, for the impact step. */
+    symbol?: string;
+    timeline?: Timeline;
   };
 }
 
@@ -127,6 +148,14 @@ export interface OssSide {
   healthy: boolean;
 }
 
+/** Two captures of a vendor's page, and whether they actually differ. */
+export interface Captures {
+  vendor: string;
+  before?: { file: string; at: string; bytes: number };
+  after?: { file: string; at: string; bytes: number };
+  differ: boolean;
+}
+
 /** One vendor on the watchlist, and what the last look at it found. */
 export interface VendorRow {
   vendor: string;
@@ -174,6 +203,9 @@ export interface Adapter {
 
   /** What actually happened when both versions of each dependency were run. */
   listOssProofs(): Promise<OssProof[]>;
+
+  /** The two most recent captures of a vendor's page. */
+  listCaptures(vendor: string): Promise<Captures>;
 
   /**
    * Whether there is a live agent session to talk to *right now*.

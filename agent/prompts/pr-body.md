@@ -1,16 +1,21 @@
-## Upstream change detected — {{vendor}}
+{{severityLine}}
 
-**Changelog entry** ({{entry.date}}): {{entry.title}}
-> {{entry.body_excerpt}}
-Source: {{entry.url}}
+**Upstream change** · {{entry.date}} · {{entry.title}}
 
-**Why this matters:** {{rationale}}
+**Why it matters.** {{because}}
 
-**Files changed:** {{files}}
+**What they said**
+{{entry.body_excerpt}}
 
-**Tests:**
+[{{entry.url}}]({{entry.url}})
+
+**What I changed**
+{{files}}
+
+**Verification.** {{verification}}
+
 ```
 {{testOutput}}
 ```
 
-Opened by Upstream Watch. Merge requires human approval in the TrueForge session.
+{{provenance}}

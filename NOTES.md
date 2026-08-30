@@ -764,3 +764,40 @@ after it.
 **Cause:** _TBD_
 **Fix:** _TBD_
 **Lesson:** _TBD_
+
+## 2026-08-30 — Borrowing the neighbours' vocabulary
+
+Adopted proven patterns from Dependabot, Renovate, Snyk, the API-diff tools, Visualping and
+Sentry Autofix. Three of them collided with what this repo can honestly claim, and the
+collisions were more useful than the patterns.
+
+**"N days early" is −38 for our own data.** The headline metric borrowed from the
+regenerate-on-change tools assumes you fixed it before the vendor turned it off. OpenAI shut
+`gpt-5.1-codex-mini` down on 2026-07-23; PR #13 merged on 2026-08-30. Rendering "38 days
+early" would have been a lie in the most flattering possible direction. The timeline now
+reads the gap in both directions and calls the bad one what it is: **"38 days exposed. It
+stopped working on 23 Jul and nothing noticed until we looked."** That is a better argument
+for the product than the flattering version, because it is the thing that actually happens.
+
+**The compatibility line named an emulator we deleted.** Dependabot's analogue is a
+compatibility score derived from other people's CI; the brief asked for "verified against
+emulated post-`<date>` behaviour". We removed the emulator when the deprecation turned out
+to have already happened, so the honest claim is stronger: *checked against the live
+upstream, which already refuses the old call.* No simulation to caveat.
+
+**`verification` will not report counts it could not read.** `PatchResult` carries no test
+counts, so I first derived them from fields that do not exist. Parsing vitest's summary is
+the fix, but the important half is what happens when there is no summary: it says the suite
+passed without counts, rather than `0/0 tests pass`, which would dress an unmeasured run as
+a clean one. Same for the upstream check — with no before/after pair it says so explicitly
+instead of implying a verification nobody performed.
+
+**And the page slider renders nothing when the page did not move.** All five OpenAI captures
+are byte-identical. A draggable divider over two copies of the same page implies a redesign
+nobody made, so `PageDiff` says the captures match and stops. It reports a restructure; it
+does not suggest one.
+
+Not borrowed, deliberately: chat-first layouts, node graphs, and Dependabot's notification
+volume. FYI changes never open a PR or raise a card — a real OpenAI run has 86 breaking
+entries and one that touches us, and treating all 86 as urgent is how a watcher becomes the
+thing everyone ignores.

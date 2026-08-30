@@ -49,11 +49,12 @@ describe("buildPr", () => {
   it("renders the template from agent/prompts/pr-body.md", async () => {
     const pr = await buildPr({ event: event(), patch, provenance: "live" });
 
-    expect(pr.body).toContain("## Upstream change detected — stripe");
-    expect(pr.body).toContain("2026-08-26");
+    // The verdict leads: "breaking now" and "FYI" are different asks of a reviewer, and
+    // they should know which before reading anything else.
+    expect(pr.body).toContain("## Breaking now, since 2026-08-26");
     expect(pr.body).toContain("`demo-app/src/payments.ts`");
     expect(pr.body).toContain("Tests 14 passed");
-    expect(pr.body).toContain("Merge requires human approval");
+    expect(pr.body).toContain("merge requires approval in the TrueForge session");
   });
 
   it("is honest about provenance", async () => {
@@ -61,7 +62,8 @@ describe("buildPr", () => {
     const cached = await buildPr({ event: event(), patch, provenance: "cache" });
 
     expect(liveRun.body).toContain("live via Bright Data");
-    expect(cached.body).toContain("from cache");
+    expect(liveRun.body).toContain("was read live during this run");
+    expect(cached.body).toContain("read from a committed capture, not fetched live");
   });
 
   it("opens a draft and says so when tests did not pass", async () => {
@@ -130,5 +132,31 @@ describe("buildPr", () => {
     const pr = await buildPr({ event: event(), patch, provenance: "live" });
 
     expect(pr.body).toContain("`PaymentIntent#create`");
+  });
+});
+
+describe("what the PR body will and will not claim", () => {
+  it("does not report counts it could not read", async () => {
+    const { countsFrom } = await import("../src/lib/pr.ts");
+
+    // A run with no vitest summary did not pass zero tests — it did not report. Rendering
+    // "0/0 tests pass" would dress an unmeasured run as a clean one.
+    expect(countsFrom("boom: command not found")).toBeUndefined();
+    expect(countsFrom("  Tests  21 passed | 2 failed (23)")).toEqual({ passed: 21, failed: 2 });
+  });
+
+  it("does not imply an upstream check that never ran", async () => {
+    const { verification } = await import("../src/lib/pr-body-fields.ts");
+
+    const noProof = verification({ counts: { passed: 12, failed: 0 }, passed: true });
+    expect(noProof).toMatch(/says nothing about how the vendor behaves/);
+
+    const proved = verification({
+      before: { version: "gpt-5.1-codex-mini", observed: "404" },
+      after: { version: "gpt-5.6-terra", observed: "200" },
+      counts: { passed: 23, failed: 0 },
+      passed: true,
+    });
+    expect(proved).toMatch(/already refuses the old call/);
   });
 });

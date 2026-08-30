@@ -6,7 +6,7 @@
  * sentences the screen shows, and calls a small local runner for the before/after proof.
  */
 
-import type { Adapter, OssProof, PackageFinding, Phase, RunChunk, RunResult, UiEvent, VendorResult, VendorRow } from "./adapter.ts";
+import type { Adapter, Captures, OssProof, PackageFinding, Severity, Timeline, Phase, RunChunk, RunResult, UiEvent, VendorResult, VendorRow } from "./adapter.ts";
 
 /** The proof runner is a separate service; its failures should be distinguishable. */
 export class ProofRunnerError extends Error {
@@ -96,7 +96,58 @@ function toUiEvent(state: SessionState): UiEvent {
       pr: pr?.prNumber ? { url: pr.prUrl, number: pr.prNumber } : undefined,
       commit: undefined,
       approvalId: pending?.id,
+      ...severityFor(pending),
+      timeline: timelineFor(pending, pr, state),
     },
+  };
+}
+
+/**
+ * The verdict and its sentence.
+ *
+ * The tense matters more than the colour: a shutdown behind us is not a warning, it is a
+ * diagnosis, and the card has to say so. Returns nothing when there is no entry to judge,
+ * rather than defaulting to the reassuring end of the scale.
+ */
+function severityFor(
+  pending: SessionState["pending"][number] | undefined,
+): { severity?: Severity; because?: string; alreadyPast?: boolean; symbol?: string } {
+  if (!pending) return {};
+
+  const symbol = pending.entry.title.replace(/`/g, "").trim() || undefined;
+  const date = pending.entry.date;
+  const past = date ? Date.parse(`${date}T00:00:00Z`) <= Date.now() : false;
+  const what = symbol ? `\`${symbol}\`` : "something this repo calls";
+
+  // Matched a symbol we call, and the vendor published a date.
+  if (date) {
+    return {
+      severity: "breaks",
+      alreadyPast: past,
+      symbol,
+      because: past
+        ? `${what} stopped working on ${date}. This is not a warning — it already happened.`
+        : `${what} stops working on ${date}.`,
+    };
+  }
+
+  return { severity: "behaviour", symbol, because: `${what} changed in ${pending.entry.vendor ?? "this vendor"}.` };
+}
+
+/** Announced → detected → fixed → merged, against the date it stops working. */
+function timelineFor(
+  pending: SessionState["pending"][number] | undefined,
+  pr: SessionState["done"][number] | undefined,
+  state: SessionState,
+): Timeline {
+  const day = (iso?: string | null) => (iso ? iso.slice(0, 10) : undefined);
+
+  return {
+    announced: pending?.entry.date,
+    detected: day(state.summary.lastCheck),
+    fixed: pending?.testsPassed ? day(state.summary.lastCheck) : undefined,
+    merged: pr?.status === "merged" ? day(pr.at) : undefined,
+    shutdown: pending?.entry.date,
   };
 }
 
@@ -264,6 +315,12 @@ class RealAdapter implements Adapter {
       throw new ProofRunnerError("No stored dependency proofs — run `pnpm oss:proof`", res.status);
     }
     return (await res.json()) as OssProof[];
+  }
+
+  async listCaptures(vendor: string): Promise<Captures> {
+    const res = await fetch(`${RUNNER}/captures?vendor=${encodeURIComponent(vendor)}`);
+    if (!res.ok) throw new ProofRunnerError(`no captures for ${vendor}`, res.status);
+    return (await res.json()) as Captures;
   }
 
   hasLiveSession(): boolean {
