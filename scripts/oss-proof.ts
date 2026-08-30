@@ -21,6 +21,7 @@ import { promisify } from "node:util";
 import { loadPackages, type WatchedPackage } from "../pipeline/src/lib/packages.ts";
 import { fromRepoRoot } from "../pipeline/src/lib/paths.ts";
 import { UpstreamWatchError } from "../pipeline/src/errors.ts";
+import { appendNote } from "../pipeline/src/lib/notes.ts";
 
 const run = promisify(execFile);
 
@@ -33,6 +34,14 @@ export interface Side {
   detail: string;
   /** Whether the code behaved the way it was written to. */
   healthy: boolean;
+  /**
+   * True when this side could not be RUN, as distinct from having run and failed.
+   *
+   * An install that 404s and a version that removed your function both end with a probe
+   * that produced nothing. Calling both "unhealthy" turns a broken network into a reported
+   * breaking change — a finding about the vendor invented by our own infrastructure.
+   */
+  couldNotRun?: boolean;
 }
 
 export interface OssProof {
@@ -55,10 +64,21 @@ async function side(pkg: WatchedPackage, version: string, probeSource: string): 
     await writeFile(join(dir, "package.json"), JSON.stringify({ name: "probe", version: "1.0.0", private: true }));
     await writeFile(join(dir, "probe.cjs"), probeSource);
 
-    await run("npm", ["install", "--silent", "--no-audit", "--no-fund", ...installArgs(pkg, version)], {
-      cwd: dir,
-      maxBuffer: 40 * 1024 * 1024,
-    });
+    try {
+      await run("npm", ["install", "--silent", "--no-audit", "--no-fund", ...installArgs(pkg, version)], {
+        cwd: dir,
+        maxBuffer: 40 * 1024 * 1024,
+      });
+    } catch (error) {
+      const e = error as { stderr?: string };
+      return {
+        version,
+        observed: "could not install this version",
+        detail: (e.stderr ?? "").trim().split("\n").slice(0, 2).join(" ").slice(0, 200) || "npm install failed",
+        healthy: false,
+        couldNotRun: true,
+      };
+    }
 
     let stdout = "";
     try {
@@ -70,7 +90,13 @@ async function side(pkg: WatchedPackage, version: string, probeSource: string): 
       stdout = e.stdout ?? "";
       if (!stdout.trim()) {
         const why = (e.stderr ?? "").trim().split("\n").slice(0, 2).join(" ").slice(0, 200);
-        return { version, observed: "the probe could not run", detail: why || "no output", healthy: false };
+        return {
+          version,
+          observed: "the probe could not run",
+          detail: why || "no output",
+          healthy: false,
+          couldNotRun: true,
+        };
       }
     }
 
@@ -149,7 +175,10 @@ export async function storeProofs(proofs: OssProof[], file = STORE): Promise<voi
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
   const only = args.includes("--package") ? args[args.indexOf("--package") + 1] : undefined;
-  const persist = !args.includes("--no-persist");
+  // Writing is opt-IN. `pnpm oss:proof` installs packages and takes minutes; having it also
+  // overwrite the file the UI reads, by default, means an interrupted or partial run can
+  // replace a good stored answer with a worse one.
+  const persist = args.includes("--save");
 
   const packages = (await loadPackages()).filter((p) => !only || p.name === only || p.package === only);
   if (packages.length === 0) throw new ProbeError(`no watched package matches ${only}`, { only });
@@ -171,16 +200,38 @@ async function main(): Promise<void> {
     const proof = await proveOne(p, latest);
     proofs.push(proof);
 
-    const arrow = proof.before.healthy && !proof.after.healthy ? "BROKE" : proof.after.healthy ? "fine" : "check";
+    // A side that could not run proves nothing in either direction. Reporting it as BROKE
+    // would credit our own npm failure to the vendor.
+    const unrunnable = proof.before.couldNotRun || proof.after.couldNotRun;
+    const arrow = unrunnable
+      ? "INCONCLUSIVE"
+      : proof.before.healthy && !proof.after.healthy
+        ? "BROKE"
+        : proof.after.healthy
+          ? "fine"
+          : "check";
     console.log(`${arrow}\n    before  ${proof.before.observed}\n    after   ${proof.after.observed}`);
   }
 
-  if (persist && !only) await storeProofs(proofs);
+  if (persist && !only) {
+    await storeProofs(proofs);
+    console.log(`\n  saved to ui/public/oss-proofs.json`);
+  } else if (!only) {
+    console.log(`\n  not saved — pass --save to update ui/public/oss-proofs.json`);
+  }
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  main().catch((error: unknown) => {
-    console.error(error instanceof Error ? error.message : String(error));
+  main().catch(async (error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(message);
+    // CLAUDE.md §2.5: a prover that dies quietly is indistinguishable from one that proved
+    // nothing was wrong.
+    await appendNote({
+      summary: `oss:proof failed: ${message.slice(0, 60)}`,
+      where: "scripts/oss-proof.ts",
+      symptom: message,
+    }).catch(() => undefined);
     process.exitCode = 1;
   });
 }

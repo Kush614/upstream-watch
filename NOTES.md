@@ -637,3 +637,38 @@ it was not is eslint refusing to run at all.
 **`--slurp` cannot be combined with `--jq`** in `gh api`. This one failed loudly and reached
 the UI as `/packages -> 500`, which is the good version of this story: it broke visibly
 instead of returning a short list that looked like a complete one.
+
+## 2026-08-30 — Failure paths in the dependency watcher
+
+**`store()` — `scripts/oss-check.ts`.** Writes `ui/public/packages.json`, which the explorer
+reads when nothing is running. A missing file is the normal first run. An *unreadable* one
+throws rather than being overwritten: replacing the only offline answer the UI has, because
+we could not parse it, would leave the tree empty — and an empty tree reads as "nothing
+upstream can hurt you".
+
+Both writers are now **opt-in** (`--save`). `oss:check` makes four network reads per package
+and `oss:proof` installs two majors of each; a run that is interrupted, rate-limited or
+partial should not be able to replace a good stored answer with a worse one just by being
+the most recent thing that ran.
+
+**`versionsOf()` — the npm registry.** A non-2xx throws `RegistryError` with the status; a
+package with no `latest` dist-tag or no plain x.y.z versions throws rather than returning an
+empty release list, which a caller would read as "nothing published". Callers surface it:
+`oss:check` logs to NOTES.md and exits non-zero, and the explorer refuses to render an empty
+tree.
+
+**`releases()` / `compare()` — the source repository.** Both shell out to `gh` and both
+throw `SourceError` carrying the failing arguments. `compare` is the dangerous one: it tries
+each known tag convention (`v5.0.0`, `5.0.0`, `express@5.0.0`) and throws if none resolve,
+because a 404 caught here would render as **"the source shows no changes"** — the strongest
+reassurance the tool can give, produced by a string-format mismatch.
+
+**`side()` — `scripts/oss-proof.ts`.** A probe that could not be *run* is now distinguished
+from a version that ran and failed. An npm install that 404s and a major that removed your
+function both end with no probe output; calling both "unhealthy" turns a broken network into
+a reported breaking change — a finding about the vendor manufactured by our own
+infrastructure. Such a run reports `INCONCLUSIVE`, never `BROKE`.
+
+**Fakes.** Both external clients now ship fixture-backed fakes (CLAUDE.md §7), and the
+fixtures carry the two cases that matter: express's real `5.0.0-beta.1`, so prerelease
+filtering is actually exercised, and a comparison capped at exactly 300 files.

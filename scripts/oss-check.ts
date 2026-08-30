@@ -14,11 +14,18 @@ import { readFile, writeFile } from "node:fs/promises";
 import { versionsOf, staleness, majorOf } from "../pipeline/src/clients/registry.ts";
 import { fromRepoRoot } from "../pipeline/src/lib/paths.ts";
 import { loadPackages, type WatchedPackage } from "../pipeline/src/lib/packages.ts";
-import { releases, compare } from "../pipeline/src/clients/source.ts";
+import { releases, compare, mentions } from "../pipeline/src/clients/source.ts";
 import { ConfigError } from "../pipeline/src/errors.ts";
+import { appendNote } from "../pipeline/src/lib/notes.ts";
 
 export interface PackageFinding {
   package: string;
+  /** A finding about this repo, or a demonstration that explicitly is not. */
+  role: "dependency" | "reference";
+  /** Why a reference is shown, and that it does not apply here. */
+  note?: string;
+  /** Declared symbols that appear in none of the declared files. */
+  unusedSymbols?: string[];
   repo: string;
   pinned: string;
   latest: string;
@@ -38,18 +45,26 @@ export interface PackageFinding {
   truncated?: boolean;
   /** Set when the pin could not be parsed; never rendered as "up to date". */
   unparseablePin?: string;
+  /** Set when the registry's own latest could not be parsed — not the pin's fault. */
+  unparseableLatest?: string;
   files: string[];
 }
 
 export async function checkPackage(p: WatchedPackage): Promise<PackageFinding> {
   const versions = await versionsOf(p.package);
-  const stale = staleness(versions, p.pinned);
+  // A reference is compared against the version it names, not against latest: it documents
+  // one historical step, and re-pointing it at latest would change what it claims.
+  const target = p.role === "reference" ? (p.against ?? versions.latest) : versions.latest;
+  const stale = staleness({ ...versions, latest: target }, p.pinned);
 
   const finding: PackageFinding = {
     package: p.package,
+    role: p.role,
+    note: p.note,
+    unusedSymbols: p.unusedSymbols?.length ? p.unusedSymbols : undefined,
     repo: p.repo,
     pinned: p.pinned,
-    latest: versions.latest,
+    latest: target,
     majorsBehind: stale.majorsBehind,
     daysSincePinned: stale.daysSincePinned,
     breakAvailableSince: stale.nextMajor?.published ?? null,
@@ -62,15 +77,22 @@ export async function checkPackage(p: WatchedPackage): Promise<PackageFinding> {
   // Nothing above the pin means nothing to warn about. Say so by returning empty findings
   // rather than by inventing reassurance.
   finding.unparseablePin = stale.unparseablePin;
-  if (stale.unparseablePin) return finding;
+  finding.unparseableLatest = stale.unparseableLatest;
+  if (stale.unparseablePin || stale.unparseableLatest) return finding;
   if (stale.majorsBehind === 0) return finding;
 
-  for (const note of await releases(p.repo, 30)) {
+  // Match only on symbols this repo actually uses. A declared-but-absent symbol is still
+  // REPORTED (as unusedSymbols) so the config error is visible, but it must not manufacture
+  // a finding about code that does not exist.
+  const used = p.symbols.filter((s) => !p.unusedSymbols?.includes(s));
+  if (used.length === 0) return finding;
+
+  for (const note of await releases(p.repo, 4)) {
     const major = majorOf(note.tag.replace(/^v/, ""));
     if (major === null || major <= (majorOf(p.pinned) ?? 0)) continue;
 
-    for (const symbol of p.symbols) {
-      const line = note.body.split("\n").find((l) => l.includes(symbol));
+    for (const symbol of used) {
+      const line = note.body.split("\n").find((l) => mentions(l, symbol));
       if (line) {
         finding.announced.push({ tag: note.tag, url: note.url, quote: line.trim().slice(0, 200) });
         break;
@@ -78,11 +100,12 @@ export async function checkPackage(p: WatchedPackage): Promise<PackageFinding> {
     }
   }
 
-  if (stale.nextMajor) {
-    // Compare through to LATEST, not merely to the next major. eslint is two majors behind:
-    // stopping at 9.0.0 would examine none of the 10.x changes and then report what looks
-    // like a complete answer.
-    const diff = await compare(p.repo, p.pinned, versions.latest, p.symbols, p.package);
+  {
+    // Deliberately NOT gated on nextMajor. A package that never published an x.0.0 for the
+    // major above the pin (or tags releases unusually) would otherwise skip the source
+    // comparison altogether and report zero code changes — the reassuring answer, produced
+    // by not looking. The comparison is what we came for; the date is a bonus.
+    const diff = await compare(p.repo, p.pinned, target, used, p.package);
     finding.inSource = diff.hits;
     finding.compareUrl = diff.url;
     finding.commits = diff.commits;
@@ -94,14 +117,23 @@ export async function checkPackage(p: WatchedPackage): Promise<PackageFinding> {
 }
 
 function render(f: PackageFinding): void {
-  if (f.unparseablePin) {
-    console.log(`\n  ${f.package}  pinned as "${f.unparseablePin}" → ${f.latest}`);
-    console.log(`    ⚠ that pin is not a plain x.y.z, so nothing here was checked — this is NOT "up to date"`);
+  if (f.unparseablePin || f.unparseableLatest) {
+    const which = f.unparseablePin
+      ? `your pin "${f.unparseablePin}"`
+      : `the registry's latest "${f.unparseableLatest}"`;
+    console.log(`\n  ${f.package}  ${f.pinned} → ${f.latest}`);
+    console.log(`    ⚠ ${which} is not a plain x.y.z, so nothing here was checked — this is NOT "up to date"`);
     return;
   }
 
   const behind = f.majorsBehind === 0 ? "up to date" : `${f.majorsBehind} major${f.majorsBehind > 1 ? "s" : ""} behind`;
-  console.log(`\n  ${f.package}  ${f.pinned} → ${f.latest}   ${behind}`);
+  const tag = f.role === "reference" ? "  [reference — not this repo]" : "";
+  console.log(`\n  ${f.package}  ${f.pinned} → ${f.latest}   ${behind}${tag}`);
+
+  if (f.unusedSymbols?.length) {
+    // Watching a symbol nobody calls manufactures a finding about code that does not exist.
+    console.log(`    ⚠ declared but not found in the watched files: ${f.unusedSymbols.join(", ")}`);
+  }
   if (f.majorsBehind === 0) return;
 
   if (f.breakAvailableSince) {
@@ -176,7 +208,8 @@ async function main(): Promise<void> {
   const asJson = args.includes("--json");
   // Same opt-out the vendor scraper has, and for the same reason: looking should never
   // change what the next run sees.
-  const persist = !args.includes("--no-persist");
+  // Opt-IN, like oss:proof. Looking should never quietly replace the answer the UI shows.
+  const persist = args.includes("--save");
 
   const packages = (await loadPackages()).filter((p) => !only || p.name === only || p.package === only);
   if (packages.length === 0) throw new ConfigError(`no watched package matches ${only}`, { only });
@@ -192,8 +225,16 @@ async function main(): Promise<void> {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  main().catch((error: unknown) => {
-    console.error(error instanceof Error ? error.message : String(error));
+  main().catch(async (error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(message);
+    // Every top-level failure is written down (CLAUDE.md §2.5) — a watcher that dies
+    // quietly is indistinguishable from one that found nothing.
+    await appendNote({
+      summary: `oss:check failed: ${message.slice(0, 60)}`,
+      where: "scripts/oss-check.ts",
+      symptom: message,
+    }).catch(() => undefined);
     process.exitCode = 1;
   });
 }

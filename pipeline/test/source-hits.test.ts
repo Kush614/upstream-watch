@@ -21,3 +21,22 @@ describe("code versus prose in a diff", () => {
     expect(kindOf("docs/api.mdx")).toBe("docs");
   });
 });
+
+describe("symbol matching", () => {
+  it("does not let a longer name masquerade as the symbol", async () => {
+    const { mentions } = await import("../src/clients/source.ts");
+
+    // The real false positive: an express 5.1.0 release note about the ETag option in
+    // res.sendFile was counted as evidence about res.send.
+    expect(mentions("+ add support for ETag option in res.sendFile", "res.send")).toBe(false);
+    expect(mentions("- res.send(status) is removed", "res.send")).toBe(true);
+    expect(mentions("- calls res.send", "res.send")).toBe(true);
+  });
+
+  it("still matches when the symbol ends the line or meets punctuation", async () => {
+    const { mentions } = await import("../src/clients/source.ts");
+    expect(mentions("uses createRoot", "createRoot")).toBe(true);
+    expect(mentions("import { createRoot } from x", "createRoot")).toBe(true);
+    expect(mentions("createRootContainer()", "createRoot")).toBe(false);
+  });
+});
