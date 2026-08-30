@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { buildTree, findNode, type Node, type Tone } from "../lib/tree.ts";
-import type { PackageFinding, VendorRow } from "../adapter.ts";
+import type { OssProof, PackageFinding, VendorRow } from "../adapter.ts";
 
 /**
  * Everything upstream of this repo, in one tree.
@@ -127,8 +127,16 @@ function Pane({ node }: { node?: Node }) {
   );
 }
 
-export function Explorer({ vendors, packages }: { vendors: VendorRow[]; packages: PackageFinding[] }) {
-  const tree = useMemo(() => buildTree(vendors, packages), [vendors, packages]);
+export function Explorer({
+  vendors,
+  packages,
+  proofs,
+}: {
+  vendors: VendorRow[];
+  packages: PackageFinding[];
+  proofs: OssProof[];
+}) {
+  const tree = useMemo(() => buildTree(vendors, packages, proofs), [vendors, packages, proofs]);
   const [selected, setSelected] = useState("");
   const node = useMemo(() => findNode(tree, selected), [tree, selected]);
 
@@ -136,7 +144,7 @@ export function Explorer({ vendors, packages }: { vendors: VendorRow[]; packages
     <section className="rounded-xl border border-line bg-panel p-4">
       <div className="mb-3 flex items-baseline justify-between gap-3">
         <h2 className="text-[15px] font-semibold">Everything upstream of this repo</h2>
-        <p className="text-[12.5px] text-dim">a hosted API gives you one source; a dependency gives you three</p>
+        <p className="text-[12.5px] text-dim">a hosted API gives you one source; a dependency lets you run both versions</p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">

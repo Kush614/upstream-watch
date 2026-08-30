@@ -9,7 +9,7 @@
  * A vendor has one source. A package has three, and they disagree — which is the finding.
  */
 
-import type { PackageFinding, VendorRow } from "../adapter.ts";
+import type { OssProof, PackageFinding, VendorRow } from "../adapter.ts";
 
 export type Tone = "ok" | "warn" | "bad" | "dim";
 
@@ -61,7 +61,34 @@ function vendorNode(v: VendorRow): Node {
   };
 }
 
-function packageNode(p: PackageFinding): Node {
+/**
+ * The fourth source, and the only one that is not a reading of someone else's words:
+ * both versions installed and run.
+ */
+function proofNode(proof: OssProof): Node {
+  const broke = proof.before.healthy && !proof.after.healthy;
+
+  return {
+    id: `pkg:${proof.package}:proof`,
+    label: "run on both versions",
+    badge: broke ? "breaks" : proof.after.healthy ? "still works" : "check",
+    tone: broke ? "bad" : proof.after.healthy ? "ok" : "warn",
+    detail: {
+      title: `${proof.symbol} — before and after`,
+      summary: broke
+        ? "The same probe, run against both versions. Nothing here is inferred from a changelog."
+        : "The same probe against both versions did not show a break on this symbol.",
+      facts: [
+        { label: `before · ${proof.before.version}`, value: `${proof.before.observed}\n${proof.before.detail}`, mono: true },
+        { label: `after · ${proof.after.version}`, value: `${proof.after.observed}\n${proof.after.detail}`, mono: true },
+        ...(proof.probe ? [{ label: "the probe both sides ran", value: proof.probe, mono: true }] : []),
+        { label: "run at", value: new Date(proof.at).toLocaleString() },
+      ],
+    },
+  };
+}
+
+function packageNode(p: PackageFinding, proof?: OssProof): Node {
   const code = p.inSource.filter((h) => h.kind === "code");
   const behind = p.majorsBehind === 0;
 
@@ -120,6 +147,8 @@ function packageNode(p: PackageFinding): Node {
     },
   ];
 
+  if (proof) children.push(proofNode(proof));
+
   return {
     id: `pkg:${p.package}`,
     label: p.package,
@@ -143,7 +172,8 @@ function packageNode(p: PackageFinding): Node {
 }
 
 /** The whole tree. Groups exist so the reader sees the asymmetry immediately. */
-export function buildTree(vendors: VendorRow[], packages: PackageFinding[]): Node[] {
+export function buildTree(vendors: VendorRow[], packages: PackageFinding[], proofs: OssProof[] = []): Node[] {
+  const proofOf = new Map(proofs.map((p) => [p.package, p]));
   return [
     {
       id: "group:apis",
@@ -155,9 +185,9 @@ export function buildTree(vendors: VendorRow[], packages: PackageFinding[]): Nod
     {
       id: "group:deps",
       label: "Dependencies",
-      badge: `${packages.length} watched · 3 sources each`,
+      badge: `${packages.length} watched · ${proofs.length > 0 ? "3 sources + run on both" : "3 sources each"}`,
       tone: "dim",
-      children: packages.map(packageNode),
+      children: packages.map((p) => packageNode(p, proofOf.get(p.package))),
     },
   ];
 }

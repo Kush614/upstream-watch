@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { currentPhase, mergedDetail, type Adapter, type Phase, type RunResult, type UiEvent, type VendorRow, type PackageFinding } from "./adapter.ts";
+import { currentPhase, mergedDetail, type Adapter, type Phase, type RunResult, type UiEvent, type VendorRow, type PackageFinding, type OssProof } from "./adapter.ts";
 import { mockAdapter } from "./adapter.mock.ts";
 import { realAdapter } from "./adapter.real.ts";
 import { HEADLINES, fill } from "./copy.ts";
@@ -26,6 +26,7 @@ export function App() {
   const [error, setError] = useState<string | null>(null);
   const [vendors, setVendors] = useState<VendorRow[]>([]);
   const [packages, setPackages] = useState<PackageFinding[]>([]);
+  const [ossProofs, setOssProofs] = useState<OssProof[]>([]);
   const [sound, setSound] = useState(false);
   const play = useSound(sound);
   const lastPhase = useRef<Phase>("idle");
@@ -44,6 +45,7 @@ export function App() {
     const surface = (e: unknown) => setError(e instanceof Error ? e.message : String(e));
     void adapter.listVendors().then(setVendors).catch(surface);
     void adapter.listPackages().then(setPackages).catch(surface);
+    void adapter.listOssProofs().then(setOssProofs).catch(surface);
 
     return adapter.subscribe((e) => setEvents((prev) => [...prev, e]));
   }, []);
@@ -152,7 +154,7 @@ export function App() {
           <ProofColumn label="after" result={after} running={running} />
         </div>
 
-        <Explorer vendors={vendors} packages={packages} />
+        <Explorer vendors={vendors} packages={packages} proofs={ossProofs} />
 
         <Watchlist rows={vendors} onCheck={(v) => adapter.checkVendor(v)} />
 

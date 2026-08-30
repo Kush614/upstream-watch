@@ -91,6 +91,32 @@ export interface PackageFinding {
   symbols?: string[];
 }
 
+/**
+ * One dependency break, proved by running both versions.
+ *
+ * Mirrors `OssProof` in scripts/oss-proof.ts. The two sides ran the SAME probe, which is
+ * what makes them comparable — running different code against each version would prove only
+ * that two different programs behave differently.
+ */
+export interface OssProof {
+  package: string;
+  repo: string;
+  symbol: string;
+  severity: "silent" | "loud";
+  before: OssSide;
+  after: OssSide;
+  /** The probe source, so the method can be read rather than trusted. */
+  probe: string;
+  at: string;
+}
+
+export interface OssSide {
+  version: string;
+  observed: string;
+  detail: string;
+  healthy: boolean;
+}
+
 /** One vendor on the watchlist, and what the last look at it found. */
 export interface VendorRow {
   vendor: string;
@@ -135,6 +161,9 @@ export interface Adapter {
 
   /** Every watched dependency, read from its registry, its releases and its source. */
   listPackages(): Promise<PackageFinding[]>;
+
+  /** What actually happened when both versions of each dependency were run. */
+  listOssProofs(): Promise<OssProof[]>;
 
   /**
    * Whether there is a live agent session to talk to *right now*.

@@ -9,7 +9,7 @@
  * same thing and cannot drift apart.
  */
 
-import { WatchlistError, type Adapter, type Citation, type PackageFinding, type RunChunk, type RunResult, type UiEvent, type VendorResult, type VendorRow } from "./adapter.ts";
+import { WatchlistError, type Adapter, type Citation, type OssProof, type PackageFinding, type RunChunk, type RunResult, type UiEvent, type VendorResult, type VendorRow } from "./adapter.ts";
 
 const VENDOR = "openai";
 const SHUTDOWN = "2026-07-23";
@@ -355,6 +355,70 @@ const PACKAGES: PackageFinding[] = [
     }
   ];
 
+/** The three dependency proofs, captured verbatim from a real `pnpm oss:proof`. */
+const OSS_PROOFS: OssProof[] = [
+    {
+      "package": "express",
+      "repo": "expressjs/express",
+      "symbol": "res.send",
+      "severity": "silent",
+      "before": {
+        "version": "4.19.2",
+        "observed": "HTTP 404",
+        "detail": "res.send(404) replied 404 with body \"Not Found\"",
+        "healthy": true
+      },
+      "after": {
+        "version": "5.2.1",
+        "observed": "HTTP 200",
+        "detail": "res.send(404) replied 200 with body \"404\"",
+        "healthy": false
+      },
+      "probe": "",
+      "at": "2026-08-30T00:44:38.301Z"
+    },
+    {
+      "package": "react-dom",
+      "repo": "facebook/react",
+      "symbol": "ReactDOM.render",
+      "severity": "loud",
+      "before": {
+        "version": "18.3.1",
+        "observed": "ReactDOM.render exists",
+        "detail": "the legacy mount API is callable",
+        "healthy": true
+      },
+      "after": {
+        "version": "19.2.8",
+        "observed": "ReactDOM.render is undefined",
+        "detail": "removed \u2014 react-dom now exports: createPortal, flushSync, preconnect, prefetchDNS, preinit, preinitModule, preload, preloadModule, requestFormReset, unstable_batchedUpdates, useFormState, useFormStatus, version",
+        "healthy": false
+      },
+      "probe": "",
+      "at": "2026-08-30T00:44:38.612Z"
+    },
+    {
+      "package": "eslint",
+      "repo": "eslint/eslint",
+      "symbol": ".eslintrc",
+      "severity": "loud",
+      "before": {
+        "version": "8.57.0",
+        "observed": ".eslintrc.json was read",
+        "detail": "linted the file and reported no-unused-vars, so the config applied",
+        "healthy": true
+      },
+      "after": {
+        "version": "10.9.1",
+        "observed": ".eslintrc.json was ignored",
+        "detail": "ESLint couldn't find an eslint",
+        "healthy": false
+      },
+      "probe": "",
+      "at": "2026-08-30T00:44:39.699Z"
+    }
+  ];
+
 const STORE_KEY = "upstream-watch.mock";
 
 interface MockState { step: number; before?: RunResult; after?: RunResult }
@@ -470,6 +534,10 @@ export class MockAdapter implements Adapter {
 
   async listPackages(): Promise<PackageFinding[]> {
     return PACKAGES;
+  }
+
+  async listOssProofs(): Promise<OssProof[]> {
+    return OSS_PROOFS;
   }
 
   hasLiveSession(): boolean {
