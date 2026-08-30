@@ -1,14 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { currentPhase, mergedDetail, type Adapter, type Phase, type RunResult, type UiEvent, type VendorRow } from "./adapter.ts";
+import { currentPhase, mergedDetail, type Adapter, type Phase, type RunResult, type UiEvent, type VendorRow, type PackageFinding, type OssProof, type Captures } from "./adapter.ts";
 import { mockAdapter } from "./adapter.mock.ts";
 import { realAdapter } from "./adapter.real.ts";
 import { HEADLINES, fill } from "./copy.ts";
 import { StatusHeader } from "./components/StatusHeader.tsx";
+import { VendorTimeline } from "./components/VendorTimeline.tsx";
+import { PageDiff } from "./components/PageDiff.tsx";
+import { countsLine } from "./lib/severity.ts";
 import { Headline } from "./components/Headline.tsx";
 import { ProofColumn } from "./components/ProofColumn.tsx";
 import { NeedsYou } from "./components/NeedsYou.tsx";
 import { Receipts } from "./components/Receipts.tsx";
 import { Watchlist } from "./components/Watchlist.tsx";
+import { Explorer } from "./components/Explorer.tsx";
 import { Studio } from "./components/Studio.tsx";
 import { useSound } from "./lib/useSound.ts";
 
@@ -24,6 +28,10 @@ export function App() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [vendors, setVendors] = useState<VendorRow[]>([]);
+  const [packages, setPackages] = useState<PackageFinding[]>([]);
+  const [ossProofs, setOssProofs] = useState<OssProof[]>([]);
+  const [upstreamProblem, setUpstreamProblem] = useState<string>();
+  const [captures, setCaptures] = useState<Captures>();
   const [sound, setSound] = useState(false);
   const play = useSound(sound);
   const lastPhase = useRef<Phase>("idle");
@@ -39,16 +47,28 @@ export function App() {
 
     // The watchlist is a separate claim with a separate failure mode: if the runner is
     // down, an empty table would read as "nothing is watched", so say why instead.
-    void adapter
-      .listVendors()
-      .then(setVendors)
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)));
+    const surface = (e: unknown) => setUpstreamProblem(e instanceof Error ? e.message : String(e));
+    void adapter.listVendors().then(setVendors).catch(surface);
+    void adapter.listPackages().then(setPackages).catch(surface);
+    void adapter.listOssProofs().then(setOssProofs).catch(surface);
+    // Captures belong to the vendor this run is about. Hardcoding one meant a Cloudflare
+    // run showed OpenAI's page under the heading "their page changed".
+
 
     return adapter.subscribe((e) => setEvents((prev) => [...prev, e]));
   }, []);
 
   const phase = currentPhase(events);
   const detail = useMemo(() => mergedDetail(events), [events]);
+  const counts = useMemo(() => countsLine(events), [events]);
+
+  // Captures belong to the vendor THIS run is about. Hardcoding one meant a Cloudflare run
+  // would show OpenAI's page under the heading "their page changed". A failure is not worth
+  // an alert: the absence of a redesign is the normal case.
+  useEffect(() => {
+    if (!detail.vendor) return;
+    void adapter.listCaptures(detail.vendor).then(setCaptures).catch(() => undefined);
+  }, [detail.vendor]);
 
   // One chord when the problem appears, one when it is gone.
   useEffect(() => {
@@ -118,7 +138,7 @@ export function App() {
           <h2 className="text-[15px] font-semibold">Upstream Watch</h2>
           <p className="text-[13px] text-dim">{events.at(-1)?.message ?? "Starting up…"}</p>
         </div>
-        <StatusHeader phase={phase} shutdownDate={shutdown} />
+        <StatusHeader phase={phase} shutdownDate={shutdown} counts={counts} />
       </header>
 
       <div className="grid gap-5">
@@ -151,6 +171,8 @@ export function App() {
           <ProofColumn label="after" result={after} running={running} />
         </div>
 
+        <Explorer vendors={vendors} packages={packages} proofs={ossProofs} problem={upstreamProblem} />
+
         <Watchlist rows={vendors} onCheck={(v) => adapter.checkVendor(v)} />
 
         <Studio ask={(q) => adapter.ask(q)} sessionKnown={adapter.hasLiveSession()} />
@@ -162,6 +184,19 @@ export function App() {
             onApprove={() => void decide("approve")}
             onReject={(reason) => void decide("reject", reason)}
           />
+        )}
+
+        {captures?.differ && (
+          <section className="grid gap-2 rounded-xl border border-line bg-panel p-4">
+            <h2 className="text-[15px] font-semibold">Their page changed</h2>
+            <PageDiff captures={captures} runner="/proof" />
+          </section>
+        )}
+
+        {detail.timeline && (
+          <section className="rounded-xl border border-line bg-panel px-4 py-3.5">
+            <VendorTimeline timeline={detail.timeline} vendor={detail.vendor} />
+          </section>
         )}
 
         <Receipts detail={detail} />

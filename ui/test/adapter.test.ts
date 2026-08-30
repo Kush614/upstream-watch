@@ -189,3 +189,153 @@ describe("what the review caught on the watchlist", () => {
     await expect(new MockAdapter().checkVendor("netflix")).rejects.toBeInstanceOf(WatchlistError);
   });
 });
+
+describe("the upstream explorer", () => {
+  it("keeps real dependencies apart from reference demonstrations", async () => {
+    const { buildTree } = await import("../src/lib/tree.ts");
+    const a = new MockAdapter();
+    const tree = buildTree(await a.listVendors(), await a.listPackages(), await a.listOssProofs());
+
+    expect(tree.map((n) => n.label)).toEqual(["Hosted APIs", "Your dependencies", "Reference breaks"]);
+    // Folding a demonstration in with real dependencies is how it becomes a false claim
+    // about your codebase — which is exactly what this file used to do.
+    expect(tree[2].badge).toMatch(/not your code/);
+    expect(tree[1].badge).toMatch(/read from your manifests/);
+  });
+
+  it("gives the same package two ids when it appears in both roles", async () => {
+    const { buildTree, findNode } = await import("../src/lib/tree.ts");
+    const a = new MockAdapter();
+    const tree = buildTree(await a.listVendors(), await a.listPackages(), await a.listOssProofs());
+
+    // express is both a real dependency (current) and a reference break (4 to 5). One id
+    // for both silently renders one of them twice.
+    expect(findNode(tree, "pkg:dependency:express")?.badge).toBe("current");
+    expect(findNode(tree, "pkg:reference:express")?.badge).toBe("silent break");
+  });
+
+
+  it("never says a dependency is fine just because the runner is unreachable", async () => {
+    const { realAdapter } = await import("../src/adapter.real.ts");
+    // An empty tree reads as "nothing to worry about" — the opposite of what a dead
+    // runner actually tells you.
+    await expect(realAdapter.listPackages()).rejects.toThrow();
+  });
+});
+
+describe("the explorer's empty state", () => {
+  it("does not let an unreachable runner render as an empty watchlist", async () => {
+    // An empty tree reads as "nothing upstream can hurt you" — the most reassuring thing
+    // the page could say, and the least likely to be true.
+    const { realAdapter } = await import("../src/adapter.real.ts");
+    await expect(realAdapter.listVendors()).rejects.toThrow();
+  });
+});
+
+describe("attaching a proof to the right row", () => {
+  it("does not label a current dependency with a reference break's receipt", async () => {
+    const { buildTree, findNode } = await import("../src/lib/tree.ts");
+    const a = new MockAdapter();
+    const tree = buildTree(await a.listVendors(), await a.listPackages(), await a.listOssProofs());
+
+    // express appears twice: the real dependency (5.2.1, current) and the 4→5 reference.
+    // Keying a proof by package name alone hands the current row a 404→200 receipt from a
+    // comparison it was never part of.
+    const dep = findNode(tree, "pkg:dependency:express");
+    const ref = findNode(tree, "pkg:reference:express");
+
+    expect(dep?.children?.some((c) => c.id.endsWith(":proof"))).toBe(false);
+    expect(ref?.children?.some((c) => c.id.endsWith(":proof"))).toBe(true);
+  });
+});
+
+describe("a proof must exercise something this repo calls", () => {
+  it("does not claim a dependency breaks over a symbol the repo never uses", async () => {
+    const { buildTree, findNode } = await import("../src/lib/tree.ts");
+    const a = new MockAdapter();
+    const tree = buildTree(await a.listVendors(), await a.listPackages(), await a.listOssProofs());
+
+    // The react-dom versions genuinely match this repo's dependency, so a version-only
+    // check attaches the proof. But that proof exercises ReactDOM.render and ui/src/main.tsx
+    // mounts with createRoot — so it would say "your code breaks" over a call never made.
+    const dep = findNode(tree, "pkg:dependency:react-dom");
+    expect(dep?.children?.some((c) => c.id.endsWith(":proof"))).toBe(false);
+    expect(findNode(tree, "pkg:reference:react-dom")?.children?.some((c) => c.id.endsWith(":proof"))).toBe(true);
+  });
+});
+
+describe("severity and the timeline", () => {
+  it("says a passed shutdown already happened, in the past tense", async () => {
+    const a = new MockAdapter();
+    a.reset();
+    for (let i = 0; i < 3; i++) a.advance();
+
+    const { detail } = (await a.history()).at(-1)!;
+    expect(detail?.severity).toBe("breaks");
+    expect(detail?.alreadyPast).toBe(true);
+    // A warning about something that already broke is not a warning.
+    expect(detail?.because).toMatch(/already happened/);
+  });
+
+  it("counts one entry per vendor, not one per event", async () => {
+    const { countsLine } = await import("../src/lib/severity.ts");
+    const a = new MockAdapter();
+    a.reset();
+    for (let i = 0; i < 6; i++) a.advance();
+
+    // The same change arrives on every poll as the run progresses; counting each arrival
+    // turns one problem into a crowd.
+    expect(countsLine(await a.history())).toBe("1 breaking now");
+  });
+
+  it("reports the gap as exposure when the fix landed after the shutdown", async () => {
+    const a = new MockAdapter();
+    a.reset();
+    for (let i = 0; i < 3; i++) a.advance();
+
+    const t = (await a.history()).at(-1)!.detail!.timeline!;
+    // merged 2026-08-30, shutdown 2026-07-23 — "38 days early" would be a lie in the
+    // most flattering possible direction.
+    expect(t.shutdown! < t.merged!).toBe(true);
+  });
+});
+
+describe("a deadline is read, never inferred", () => {
+  it("does not turn a publication date into a shutdown date", async () => {
+    const { toUiEventForTest } = await import("../src/adapter.real.ts");
+
+    const state = {
+      connected: true, source: "trueforge" as const, vendors: [], steps: [], done: [],
+      pending: [{
+        id: "t::c", vendor: "cloudflare", diff: "", files: [], testsPassed: null, testOutput: "",
+        // A changelog entry, published on a date. No shutdown column anywhere.
+        entry: { vendor: "cloudflare", date: "2026-08-01", title: "Cache Rules", body: "x", url: "u", breaking: true },
+      }],
+      summary: { lastCheck: "2026-08-29T00:00:00Z", eventsSeen: 1, prsOpened: 0, prsMerged: 0, pendingApprovals: 1 },
+    };
+
+    const { detail } = toUiEventForTest(state as never);
+    expect(detail?.shutdownDate).toBeUndefined();
+    expect(detail?.timeline?.shutdown).toBeUndefined();
+    // Without a deadline there is no "already happened" to claim.
+    expect(detail?.alreadyPast).toBeFalsy();
+  });
+
+  it("does not stand in numbers for a test run it did not measure", async () => {
+    const { toUiEventForTest } = await import("../src/adapter.real.ts");
+
+    const state = {
+      connected: true, source: "trueforge" as const, vendors: [], steps: [], done: [],
+      pending: [{
+        id: "t::c", vendor: "openai", diff: "", files: [], testsPassed: true,
+        // The runner said it passed but printed no vitest summary.
+        testOutput: "everything is fine",
+        entry: { vendor: "openai", date: "2026-07-23", title: "x", body: "y", url: "u", breaking: true },
+      }],
+      summary: { lastCheck: "2026-08-29T00:00:00Z", eventsSeen: 1, prsOpened: 0, prsMerged: 0, pendingApprovals: 1 },
+    };
+
+    // 12/0 and 9/3 were literals standing in for a boolean, sitting above the approve button.
+    expect(toUiEventForTest(state as never).detail?.tests).toBeUndefined();
+  });
+});

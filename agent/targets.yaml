@@ -28,6 +28,10 @@ vendors:
 
   openai:
     url: https://platform.openai.com/docs/deprecations
+    # A deprecations table: its date column is the day the thing stops working. A changelog's
+    # date is only when the entry was published, and treating the two alike made every
+    # historical entry read as already broken. Mirrored in SKILL.md as `date_is_shutdown`.
+    date_is_shutdown: true
     schema: schemas/changelog-entry.json
     # The model demo-app/src/risk.ts is pinned to, plus API surfaces it could grow into.
     # Watch BOTH the model we were pinned to and the one we migrate to. A patch that

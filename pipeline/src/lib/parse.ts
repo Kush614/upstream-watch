@@ -88,16 +88,24 @@ function readField(entry: HTMLElement, spec: FieldSpec | undefined): string {
 function extractCss(html: string, spec: ExtractionSpec): ChangelogEntry[] {
   const root = parseHtml(html);
 
-  return root.querySelectorAll(spec.entry_selector ?? "").map((el) => ({
+  return root.querySelectorAll(spec.entry_selector ?? "").map((el) => {
+    const date = normaliseDate(readField(el, spec.fields?.date));
+
+    return {
     vendor: spec.vendor,
-    date: normaliseDate(readField(el, spec.fields?.date)),
+    date,
+    // Only where the page itself is a table of deadlines. A changelog's date is when the
+    // entry was written, and copying it here would tell every reader their service broke
+    // on the day the vendor published a note.
+    ...(spec.date_is_shutdown === true && date ? { shutdown: date } : {}),
     title: readField(el, spec.fields?.title),
     body: readField(el, spec.fields?.body),
     url: resolveUrl(readField(el, spec.fields?.url), spec.url),
     // Normally classify() decides. A source flagged breaking_default is one where the page
     // itself is the claim, so the entry carries it and classify reads it as vendor-flagged.
     breaking: spec.breaking_default === true,
-  }));
+    };
+  });
 }
 
 /* ─────────────────────── strategy: embedded-json ─────────────────────────── */

@@ -561,3 +561,346 @@ question failed. It now asks the adapter whether the harness is genuinely connec
 present one — a missing citation, an unreadable file, a dead session. That is now the sixth
 instance in this project. The tell is always the same: a `catch` that returns the shape of
 success, or a flag set before the work it describes has finished.
+
+## 2026-08-30 — Watching open source is a different problem, and an easier one
+
+The project started by watching SaaS changelog pages, which is the case where you have the
+least to work with: the vendor's page is the *only* source, and if the entry is vague or
+missing, the watch is blind. Dependencies invert that. The changelog is the least
+authoritative source available, because the registry, the release notes and the actual
+source diff are all readable — and the break can be reproduced locally by installing both
+majors, with no key and no rate limit.
+
+Verified against three household repos before building anything:
+
+```
+express 4.19.2 → 5.0.1   res.send(404)      404 "Not Found"   →  200 with body "404"
+react   18.3.1 → 19.0.0  ReactDOM.render    exists            →  removed
+eslint  8.57.0 → 9.15.0  .eslintrc.json     lints             →  "couldn't find eslint.config"
+```
+
+Express leads because it does not throw. React and ESLint fail on the first run; Express
+changes what `res.send(404)` *means*, so the error path returns 200 OK with the body `404`,
+CI stays green and uptime monitoring reports a healthy service.
+
+**Two things I got wrong on the way, both the same shape as ever.**
+
+The registry client asked for `application/vnd.npm.install-v1+json` — much smaller, and
+carries no `time` map. It failed loudly ("express published no plain versions"), which was
+luck: the interesting output is *dates*, and a silent fallback would have produced
+"1 major behind" with no sense that the break has been one `npm update` away since 2024.
+
+`compare()` built tags as the bare version. npm says `5.0.0`, expressjs tags `v5.0.0`, and
+GitHub answered 404 — which, had I caught it as "no files changed", would have rendered as
+**"the source shows no changes"**: the strongest possible reassurance, produced by a typo.
+It now tries the known conventions and throws if none resolve.
+
+**And one honesty fix in my own output.** The first working run reported "38 found in the
+source diff" for express, but the top hits were `History.md`, `README.md` and
+`Contributing.md`. Those are the changelog again, counted a second time under a heading that
+claims to be independent of it — inflating precisely the number this tool exists to compare
+against the announcement. Hits are now split `code` vs `docs`, code first, and a package
+whose only mentions are prose says so.
+
+## 2026-08-30 — Four ways the dependency watcher said "fine" without looking
+
+Qodo found three of these on #16 and the probes surfaced a fourth. Every one produces
+reassurance rather than a visible failure, which is now the recurring shape of every real
+bug in this project.
+
+**GitHub caps a compare at 300 files.** react-dom and eslint both reported *exactly* 300 —
+the tell. Files past the cap were never examined, so "0 changes to anything you call" was
+not a finding, it was the absence of one. `SourceDiff.truncated` now says which it is, and
+the CLI prints the warning next to the count.
+
+**The diff stopped at the next major.** eslint is two majors behind; comparing `8.57.0` to
+`9.0.0` examines none of the 10.x changes and then presents a complete-looking answer. Now
+compares through to latest — express went from 74 files to 105 as a result, meaning 31 files
+of real change had been invisible.
+
+**Release notes stopped at thirty.** A fixed `per_page` answers "were we told about this?"
+with "we did not look far enough". Paginated: eslint's mentions went 7 → 15.
+
+**An unparseable pin read as up to date.** `^4.19.2`, `latest`, a git URL — anything
+`majorOf` could not read fell through to `majorsBehind: 0`, which renders as the *most*
+reassuring answer in the one case where we know the least. It now carries `unparseablePin`
+and the CLI says explicitly that this is not "up to date".
+
+**And one in my own probe.** The eslint probe reported `.eslintrc.json was ignored` for
+ESLint **8**, which would have claimed the old version was already broken and destroyed the
+whole point of the column. The cause: my `.eslintrc.json` set no `parserOptions`, so ESLint
+8 defaulted to ES5 and answered `Parsing error: The keyword 'const' is reserved`. That error
+is ESLint *reading and applying* the config. The probe only looked for the rule name, missed
+it, and inverted the finding. Both outcomes now count as "the config was read"; what proves
+it was not is eslint refusing to run at all.
+
+**`--slurp` cannot be combined with `--jq`** in `gh api`. This one failed loudly and reached
+the UI as `/packages -> 500`, which is the good version of this story: it broke visibly
+instead of returning a short list that looked like a complete one.
+
+## 2026-08-30 01:03 - proof runner /packages failed: reading releases for eslint/eslint failed: Get "https://api.
+
+**Where:** scripts/proof-runner.ts
+**Symptom:** reading releases for eslint/eslint failed: Get "https://api.github.com/repositories/11061773/releases?per_page=100&page=2": read tcp 172.30.30.148:61783->172.182.252.137:443: read: connection reset by peer
+**Cause:** _TBD_
+**Fix:** _TBD_
+**Lesson:** _TBD_
+
+## 2026-08-30 01:30 - proof runner /packages failed: packages.yaml: "react-dom.pinned" must be a non-empty string
+
+**Where:** scripts/proof-runner.ts
+**Symptom:** packages.yaml: "react-dom.pinned" must be a non-empty string
+**Cause:** _TBD_
+**Fix:** _TBD_
+**Lesson:** _TBD_
+
+## 2026-08-30 01:32 - proof runner /packages failed: packages.yaml: "react-dom.pinned" must be a non-empty string
+
+**Where:** scripts/proof-runner.ts
+**Symptom:** packages.yaml: "react-dom.pinned" must be a non-empty string
+**Cause:** _TBD_
+**Fix:** _TBD_
+**Lesson:** _TBD_
+
+## 2026-08-30 01:33 - proof runner /packages failed: packages.yaml: "react-dom.pinned" must be a non-empty string
+
+**Where:** scripts/proof-runner.ts
+**Symptom:** packages.yaml: "react-dom.pinned" must be a non-empty string
+**Cause:** _TBD_
+**Fix:** _TBD_
+**Lesson:** _TBD_
+
+## 2026-08-30 01:33 - proof runner /packages failed: packages.yaml: "react-dom.pinned" must be a non-empty string
+
+**Where:** scripts/proof-runner.ts
+**Symptom:** packages.yaml: "react-dom.pinned" must be a non-empty string
+**Cause:** _TBD_
+**Fix:** _TBD_
+**Lesson:** _TBD_
+
+## 2026-08-30 — The watcher was inventing findings about our own code
+
+The sharpest review this project has had. `agent/packages.yaml` asserted, by hand, that this
+repo pinned `express` at `4.19.2`, called `ReactDOM.render`, and depended on `eslint`.
+
+None of it was true. `demo-app` depends on `express@^5.2.1`. `ui/src/main.tsx` mounts with
+`createRoot`. There is no eslint in any manifest and no config file in the tree. Every
+finding produced from those lines was a finding about code that does not exist — which is
+precisely the failure this project exists to prevent, committed by the project itself.
+
+The cause was structural, not careless: a hand-written `pinned:` field is a claim that
+drifts the moment anyone runs an upgrade, and a hand-written `symbols:` list is a claim that
+was never checked against the source at all.
+
+**What changed.** Two roles, and the separation is load-bearing:
+
+- `role: dependency` — the version is **read from the workspace manifest**, never written
+  down. Symbols are checked against the files that claim to use them, and any that appear in
+  none of them are reported as "declared but not found" rather than silently watched.
+  Declaring a dependency the manifest does not list now throws.
+- `role: reference` — a known historical break, kept because it is genuinely reproducible,
+  labelled `[reference — not this repo]` in the CLI and grouped separately in the UI.
+
+**And the results changed with it.** express is now correctly reported as *up to date*, and
+`react-dom` surfaced as a real finding: `ui` is on 18.3.1 while 19.2.8 is current.
+
+**A related false positive, same review.** Symbol matching was `String.includes`, so
+`res.send` matched `res.sendFile` — an express 5.1.0 note about "ETag option in
+res.sendFile" was being counted as an announcement about `res.send`. With that fixed,
+express's announced-mentions went 2 → 0, which means the release notes never mentioned the
+change at all, and the "the source changes something you use and the release notes do not
+mention it" warning fires correctly for the first time.
+
+**Lesson.** The recurring bug in this project is an absent thing rendered as a present one.
+This is its sharpest form: not an absent *result* dressed as a good one, but an absent
+*dependency* dressed as a real one. Configuration that asserts facts about the codebase has
+to be derived from the codebase, or verified against it, or it is just a wish with a colon
+after it.
+
+## 2026-08-30 01:36 - proof runner /packages failed: packages.yaml: "react-dom.pinned" must be a non-empty string
+
+**Where:** scripts/proof-runner.ts
+**Symptom:** packages.yaml: "react-dom.pinned" must be a non-empty string
+**Cause:** _TBD_
+**Fix:** _TBD_
+**Lesson:** _TBD_
+
+## 2026-08-30 01:36 - proof runner /packages failed: packages.yaml: "react-dom.pinned" must be a non-empty string
+
+**Where:** scripts/proof-runner.ts
+**Symptom:** packages.yaml: "react-dom.pinned" must be a non-empty string
+**Cause:** _TBD_
+**Fix:** _TBD_
+**Lesson:** _TBD_
+
+## 2026-08-30 01:44 - proof runner /packages failed: packages.yaml: "react-dom.pinned" must be a non-empty string
+
+**Where:** scripts/proof-runner.ts
+**Symptom:** packages.yaml: "react-dom.pinned" must be a non-empty string
+**Cause:** _TBD_
+**Fix:** _TBD_
+**Lesson:** _TBD_
+
+## 2026-08-30 01:44 - proof runner /packages failed: packages.yaml: "react-dom.pinned" must be a non-empty string
+
+**Where:** scripts/proof-runner.ts
+**Symptom:** packages.yaml: "react-dom.pinned" must be a non-empty string
+**Cause:** _TBD_
+**Fix:** _TBD_
+**Lesson:** _TBD_
+
+## 2026-08-30 02:05 - proof runner /packages failed: packages.yaml: "react-dom.pinned" must be a non-empty string
+
+**Where:** scripts/proof-runner.ts
+**Symptom:** packages.yaml: "react-dom.pinned" must be a non-empty string
+**Cause:** _TBD_
+**Fix:** _TBD_
+**Lesson:** _TBD_
+
+## 2026-08-30 02:10 - proof runner /packages failed: packages.yaml: "react-dom.pinned" must be a non-empty string
+
+**Where:** scripts/proof-runner.ts
+**Symptom:** packages.yaml: "react-dom.pinned" must be a non-empty string
+**Cause:** _TBD_
+**Fix:** _TBD_
+**Lesson:** _TBD_
+
+## 2026-08-30 — Borrowing the neighbours' vocabulary
+
+Adopted proven patterns from Dependabot, Renovate, Snyk, the API-diff tools, Visualping and
+Sentry Autofix. Three of them collided with what this repo can honestly claim, and the
+collisions were more useful than the patterns.
+
+**"N days early" is −38 for our own data.** The headline metric borrowed from the
+regenerate-on-change tools assumes you fixed it before the vendor turned it off. OpenAI shut
+`gpt-5.1-codex-mini` down on 2026-07-23; PR #13 merged on 2026-08-30. Rendering "38 days
+early" would have been a lie in the most flattering possible direction. The timeline now
+reads the gap in both directions and calls the bad one what it is: **"38 days exposed. It
+stopped working on 23 Jul and nothing noticed until we looked."** That is a better argument
+for the product than the flattering version, because it is the thing that actually happens.
+
+**The compatibility line named an emulator we deleted.** Dependabot's analogue is a
+compatibility score derived from other people's CI; the brief asked for "verified against
+emulated post-`<date>` behaviour". We removed the emulator when the deprecation turned out
+to have already happened, so the honest claim is stronger: *checked against the live
+upstream, which already refuses the old call.* No simulation to caveat.
+
+**`verification` will not report counts it could not read.** `PatchResult` carries no test
+counts, so I first derived them from fields that do not exist. Parsing vitest's summary is
+the fix, but the important half is what happens when there is no summary: it says the suite
+passed without counts, rather than `0/0 tests pass`, which would dress an unmeasured run as
+a clean one. Same for the upstream check — with no before/after pair it says so explicitly
+instead of implying a verification nobody performed.
+
+**And the page slider renders nothing when the page did not move.** All five OpenAI captures
+are byte-identical. A draggable divider over two copies of the same page implies a redesign
+nobody made, so `PageDiff` says the captures match and stops. It reports a restructure; it
+does not suggest one.
+
+Not borrowed, deliberately: chat-first layouts, node graphs, and Dependabot's notification
+volume. FYI changes never open a PR or raise a card — a real OpenAI run has 86 breaking
+entries and one that touches us, and treating all 86 as urgent is how a watcher becomes the
+thing everyone ignores.
+
+## 2026-08-30 — A publication date is not a deadline
+
+The worst bug in this project so far, and the one that best explains why it exists.
+
+`ChangelogEntry.date` is when the vendor *wrote the entry*. I used it everywhere a shutdown
+date was wanted — in `classify`, in `severityFor`, in `timelineFor`. The reason is
+embarrassing and instructive: on OpenAI's deprecations table those two things are the same
+column, and I had been staring at that one page for hours.
+
+What it produced: every dated changelog entry read as **"Breaking now, since \<the day they
+published it\>"**, with a "days exposed" figure counted from a deadline the vendor never
+set. A Cloudflare changelog entry from three weeks ago would have opened a PR announcing
+that your service had been broken for three weeks. The tool would have been doing, loudly
+and with a receipt, exactly the thing it exists to prevent.
+
+`entry.shutdown` is now a separate optional field, set only by an extraction spec that reads
+a real shutdown column. Absent means *we do not know of a deadline*, which is different from
+there being none and different again from the deadline being today. Without one the PR says
+"Breaking change", the timeline shows the steps and no exposure figure, and nothing claims
+anything already happened.
+
+**Two more from the same review, same shape.**
+
+`adapter.real.ts` synthesised test counts from a boolean: `passed: testsPassed ? 12 : 9,
+failed: testsPassed ? 0 : 3`. Those numbers came from nowhere — no run produced them — and
+they rendered directly above the approve button. They are now read from the runner's own
+vitest summary, and absent when there is no summary to read.
+
+The stepper said passing tests ran *"against the live upstream"*. They did not: that is the
+patch's own suite, and only the before/after proof calls the vendor. Ordinary suite success
+presented as external compatibility evidence is precisely the claim this screen exists to
+refuse. It now says so only when a proof actually ran, and otherwise states plainly that
+nothing here called the vendor.
+
+**Lesson.** Every one of these is the same failure in a new place: a value that means one
+thing being used as though it meant a stronger thing. Absent counts as good, a publication
+date as a deadline, a local test as a vendor check. The correction is always the same shape
+too — carry the weaker fact honestly, and let the screen say less.
+## 2026-08-30 — Failure paths in the dependency watcher
+
+**`store()` — `scripts/oss-check.ts`.** Writes `ui/public/packages.json`, which the explorer
+reads when nothing is running. A missing file is the normal first run. An *unreadable* one
+throws rather than being overwritten: replacing the only offline answer the UI has, because
+we could not parse it, would leave the tree empty — and an empty tree reads as "nothing
+upstream can hurt you".
+
+Both writers are now **opt-in** (`--save`). `oss:check` makes four network reads per package
+and `oss:proof` installs two majors of each; a run that is interrupted, rate-limited or
+partial should not be able to replace a good stored answer with a worse one just by being
+the most recent thing that ran.
+
+**`versionsOf()` — the npm registry.** A non-2xx throws `RegistryError` with the status; a
+package with no `latest` dist-tag or no plain x.y.z versions throws rather than returning an
+empty release list, which a caller would read as "nothing published". Callers surface it:
+`oss:check` logs to NOTES.md and exits non-zero, and the explorer refuses to render an empty
+tree.
+
+**`releases()` / `compare()` — the source repository.** Both shell out to `gh` and both
+throw `SourceError` carrying the failing arguments. `compare` is the dangerous one: it tries
+each known tag convention (`v5.0.0`, `5.0.0`, `express@5.0.0`) and throws if none resolve,
+because a 404 caught here would render as **"the source shows no changes"** — the strongest
+reassurance the tool can give, produced by a string-format mismatch.
+
+**`side()` — `scripts/oss-proof.ts`.** A probe that could not be *run* is now distinguished
+from a version that ran and failed. An npm install that 404s and a major that removed your
+function both end with no probe output; calling both "unhealthy" turns a broken network into
+a reported breaking change — a finding about the vendor manufactured by our own
+infrastructure. Such a run reports `INCONCLUSIVE`, never `BROKE`.
+
+**Fakes.** Both external clients now ship fixture-backed fakes (CLAUDE.md §7), and the
+fixtures carry the two cases that matter: express's real `5.0.0-beta.1`, so prerelease
+filtering is actually exercised, and a comparison capped at exactly 300 files.
+
+## 2026-08-30 — A range is not a version, and a probe is not universal
+
+**`^5.2.1` is not "5.2.1 is installed".** `installedVersion` took the floor of the manifest's
+range and called it the installed version. It happens to be right in this checkout, and stops
+being right the moment anyone runs an update — at which point the tool reports a version
+nobody has, against a break that may not apply to the version they do. It now reads
+`node_modules/<pkg>/package.json`, which is the only place that knows, and falls back to the
+range only with `versionIsInstalled: false` attached so callers can say "declared" rather
+than "installed".
+
+**A symbol was still a substring on one side.** `mentions()` checked the character after the
+match but not before, so `myres.send` counted as `res.send` and `config.eslintrc` as
+`.eslintrc`. Both ends are checked now.
+
+**A probe does not speak for every watch.** `agent/probes/express.cjs` exercises `res.send`.
+Running it for the express *dependency* — which is watched for `express.json` and `app.get`,
+and is on a current version — produced a "breaks" result about a call that watch does not
+cover. This is the third appearance of the same mistake: first attaching a proof to the
+wrong row by package name, then to the wrong row by version, and now running one at all for
+a watch it says nothing about. A probe now declares which symbol it exercises, and a
+dependency is proved only when that symbol is one it actually uses.
+
+**An unreadable watched file marked every symbol unused.** Which silently switched the whole
+watch off — the config error rendered as "nothing to worry about". It throws now.
+
+**And NOTES.md is a dev artefact.** `appendNote` wrote to a tracked file from any run,
+including a deployed one. That is mutating source as a side effect of an error, in a
+checkout the process does not own. Off under `NODE_ENV=production`, and `UPSTREAM_WATCH_NOTES=0`
+silences it anywhere.

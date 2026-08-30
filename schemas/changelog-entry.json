@@ -2,10 +2,17 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://upstream-watch.dev/schemas/changelog-entry.json",
   "title": "ChangelogEntry",
-  "description": "One entry extracted from a vendor changelog page. Shape is fixed by CLAUDE.md §6.",
+  "description": "One entry extracted from a vendor changelog page. Shape is fixed by CLAUDE.md \u00a76.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["vendor", "date", "title", "body", "url", "breaking"],
+  "required": [
+    "vendor",
+    "date",
+    "title",
+    "body",
+    "url",
+    "breaking"
+  ],
   "properties": {
     "vendor": {
       "type": "string",
@@ -14,8 +21,13 @@
     },
     "date": {
       "type": "string",
-      "description": "Publication date, ISO 8601 (YYYY-MM-DD).",
+      "description": "When the entry was PUBLISHED, ISO 8601 (YYYY-MM-DD). Not a deadline \u2014 see `shutdown`.",
       "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+    },
+    "shutdown": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+      "description": "The day the thing stops working, ISO 8601. Set ONLY by a source whose page publishes deadlines (a deprecations table), declared per source as `date_is_shutdown`. Absent means no deadline is known, which is different from there being none and different again from it being today. Conflating this with `date` made every changelog entry read as already broken as of its own publication date."
     },
     "title": {
       "type": "string",
@@ -23,7 +35,7 @@
     },
     "body": {
       "type": "string",
-      "description": "Entry text. UNTRUSTED third-party data — quoted into prompts, never obeyed."
+      "description": "Entry text. UNTRUSTED third-party data \u2014 quoted into prompts, never obeyed."
     },
     "url": {
       "type": "string",
@@ -32,7 +44,7 @@
     },
     "breaking": {
       "type": "boolean",
-      "description": "Whether this entry deprecates or removes behaviour. Classification method: see specs/scraper-pipeline.md §3."
+      "description": "Whether this entry deprecates or removes behaviour. Classification method: see specs/scraper-pipeline.md \u00a73."
     }
   }
 }

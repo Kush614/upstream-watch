@@ -9,7 +9,7 @@
  * same thing and cannot drift apart.
  */
 
-import { WatchlistError, type Adapter, type Citation, type RunChunk, type RunResult, type UiEvent, type VendorResult, type VendorRow } from "./adapter.ts";
+import { WatchlistError, type Adapter, type Citation, type Captures, type OssProof, type PackageFinding, type RunChunk, type RunResult, type UiEvent, type VendorResult, type VendorRow } from "./adapter.ts";
 
 const VENDOR = "openai";
 const SHUTDOWN = "2026-07-23";
@@ -21,6 +21,28 @@ const CHANGELOG = {
   excerpt: "July 23, 2026 `gpt-5.1-codex-mini` \u2192 `gpt-5.6-terra`",
   url: "https://platform.openai.com/docs/deprecations",
   sentence: "`" + OLD_MODEL + "` was shut down on " + SHUTDOWN + ".",
+};
+
+/**
+ * The verdict and the dates, from the run this mock replays.
+ *
+ * gpt-5.1-codex-mini was shut down on 2026-07-23 and PR #13 merged on 2026-08-30 — so the
+ * honest number here is not "days early". It is 38 days during which the service was
+ * already broken and nothing said so, which is the argument for the product.
+ */
+const VERDICT = {
+  severity: "breaks" as const,
+  alreadyPast: true,
+  symbol: OLD_MODEL,
+  because: "`" + OLD_MODEL + "` stopped working on " + SHUTDOWN + ". This is not a warning — it already happened.",
+};
+
+const DATES = {
+  announced: SHUTDOWN,
+  detected: "2026-08-29",
+  fixed: "2026-08-30",
+  merged: "2026-08-30",
+  shutdown: SHUTDOWN,
 };
 
 const DIFF = "diff --git a/demo-app/src/risk.ts b/demo-app/src/risk.ts\nindex 050d969..00525b1 100644\n--- a/demo-app/src/risk.ts\n+++ b/demo-app/src/risk.ts\n@@ -9,7 +9,7 @@\n const OPENAI_API = process.env.OPENAI_API_BASE ?? \"https://api.openai.com/v1\";\n \n /** Pinned deliberately. OpenAI's deprecations page lists a shutdown date for this. */\n-export const RISK_MODEL = \"gpt-5-mini-2025-08-07\";\n+export const RISK_MODEL = \"gpt-5.6-terra\";\n \n export interface RiskRequest {\n   amountCents: number;\ndiff --git a/demo-app/test/vendors.test.ts b/demo-app/test/vendors.test.ts\nindex 330ec35..b3eeb17 100644\n--- a/demo-app/test/vendors.test.ts\n+++ b/demo-app/test/vendors.test.ts\n@@ -6,7 +6,7 @@ describe(\"OpenAI risk check\", () => {\n   it(\"uses the model this service is pinned to\", () => {\n     // Pinned deliberately: OpenAI publishes a shutdown date for this model, so when the\n     // deprecation lands this assertion is what has to change alongside the call.\n-    expect(RISK_MODEL).toBe(\"gpt-5-mini-2025-08-07\");\n+    expect(RISK_MODEL).toBe(\"gpt-5.6-terra\");\n   });\n \n   it(\"builds a prompt carrying the facts a reviewer needs\", () => {\n";
@@ -39,20 +61,20 @@ export const TIMELINE: UiEvent[] = [
     phase: "change_found",
     message: VENDOR + " is retiring something your checkout uses on " + SHUTDOWN + ".",
     at: "",
-    detail: { vendor: VENDOR, shutdownDate: SHUTDOWN, changelog: CHANGELOG, files: FILES },
+    detail: { vendor: VENDOR, shutdownDate: SHUTDOWN, changelog: CHANGELOG, files: FILES, ...VERDICT, timeline: DATES },
   },
   {
     phase: "testing",
     message: "Trying your current code against how " + VENDOR + " will behave that day.",
     at: "",
-    detail: { vendor: VENDOR, shutdownDate: SHUTDOWN, changelog: CHANGELOG, files: FILES },
+    detail: { vendor: VENDOR, shutdownDate: SHUTDOWN, changelog: CHANGELOG, files: FILES, ...VERDICT, timeline: DATES },
   },
   {
     phase: "awaiting_approval",
     message: "I prepared a fix and tested it. It needs your say-so.",
     at: "",
     detail: {
-      vendor: VENDOR, shutdownDate: SHUTDOWN, changelog: CHANGELOG, files: FILES,
+      vendor: VENDOR, shutdownDate: SHUTDOWN, changelog: CHANGELOG, files: FILES, ...VERDICT, timeline: DATES,
       diff: DIFF, tests: { passed: 12, failed: 0, output: TEST_OUTPUT },
       pr: PR, approvalId: "mock-approval-1",
     },
@@ -62,7 +84,7 @@ export const TIMELINE: UiEvent[] = [
     message: "Fix applied. Your checkout will keep working on " + SHUTDOWN + ".",
     at: "",
     detail: {
-      vendor: VENDOR, shutdownDate: SHUTDOWN, changelog: CHANGELOG, files: FILES,
+      vendor: VENDOR, shutdownDate: SHUTDOWN, changelog: CHANGELOG, files: FILES, ...VERDICT, timeline: DATES,
       diff: DIFF, tests: { passed: 12, failed: 0, output: TEST_OUTPUT }, pr: PR,
       review: { url: PR.url + "#pullrequestreview" },
       commit: { sha: AFTER_SHA, url: "https://github.com/Kush614/upstream-watch/commit/" + AFTER_SHA },
@@ -196,6 +218,227 @@ const VENDORS: VendorRow[] = [
   },
 ];
 
+/**
+ * The watched upstreams, captured verbatim from a real `pnpm oss:check --json`.
+ *
+ * Two roles: real dependencies of this repo, whose versions are read from its manifests,
+ * and labelled reference breaks that are explicitly not claims about this codebase.
+ */
+const PACKAGES: PackageFinding[] = [
+    {
+      "package": "react-dom",
+      "role": "dependency",
+      "repo": "facebook/react",
+      "pinned": "18.3.1",
+      "latest": "19.2.8",
+      "majorsBehind": 1,
+      "daysSincePinned": 855,
+      "breakAvailableSince": "2024-12-05T18:10:30.516Z",
+      "severity": "loud",
+      "announced": [
+        {
+          "tag": "v19.0.0",
+          "url": "https://github.com/react/react/releases/tag/v19.0.0",
+          "quote": "* Errors in render are not re-thrown: Errors that are not caught by an Error Boundary are now reported to window.reportError. Errors that are caught by an Error Boundary are reported to console.error."
+        }
+      ],
+      "inSource": [],
+      "files": [
+        "ui/src/main.tsx"
+      ],
+      "compareUrl": "https://github.com/react/react/compare/v18.3.1...v19.2.8",
+      "commits": 5979,
+      "filesChanged": 300,
+      "truncated": true
+    },
+    {
+      "package": "express",
+      "role": "dependency",
+      "repo": "expressjs/express",
+      "pinned": "5.2.1",
+      "latest": "5.2.1",
+      "majorsBehind": 0,
+      "daysSincePinned": 271,
+      "breakAvailableSince": null,
+      "severity": "loud",
+      "announced": [],
+      "inSource": [],
+      "files": [
+        "demo-app/src/payments.ts"
+      ]
+    },
+    {
+      "package": "express",
+      "role": "reference",
+      "note": "res.send(status) was removed. The same line that replied 404 now replies 200 with the body \"404\" \u2014 nothing throws, so CI stays green and uptime monitoring reports healthy. This repo is already on express 5 and is not affected; it is here because it is the clearest example of a break that a changelog date would never have warned you about.",
+      "repo": "expressjs/express",
+      "pinned": "4.19.2",
+      "latest": "5.2.1",
+      "majorsBehind": 1,
+      "daysSincePinned": 887,
+      "breakAvailableSince": "2024-09-10T04:40:34.348Z",
+      "severity": "silent",
+      "announced": [],
+      "inSource": [
+        {
+          "file": "examples/search/index.js",
+          "symbol": "res.send",
+          "lines": [
+            "-    if (err) return res.send(500);"
+          ],
+          "kind": "code"
+        },
+        {
+          "file": "lib/response.js",
+          "symbol": "res.send",
+          "lines": [
+            "-    // res.send(body, status) backwards compat",
+            "-      deprecate('res.send(body, status): Use res.status(status).send(body) instead');"
+          ],
+          "kind": "code"
+        },
+        {
+          "file": "lib/router/index.js",
+          "symbol": "res.send",
+          "lines": [
+            "-    res.send(body);"
+          ],
+          "kind": "code"
+        },
+        {
+          "file": "lib/router/route.js",
+          "symbol": "res.send",
+          "lines": [
+            "- *     res.send('hello world');"
+          ],
+          "kind": "code"
+        }
+      ],
+      "files": [],
+      "compareUrl": "https://github.com/expressjs/express/compare/4.19.2...v5.2.1",
+      "commits": 292,
+      "filesChanged": 105,
+      "truncated": false
+    },
+    {
+      "package": "react-dom",
+      "role": "reference",
+      "note": "ReactDOM.render was removed outright. This repo mounts with createRoot and is not affected.",
+      "repo": "facebook/react",
+      "pinned": "18.3.1",
+      "latest": "19.2.8",
+      "majorsBehind": 1,
+      "daysSincePinned": 855,
+      "breakAvailableSince": "2024-12-05T18:10:30.516Z",
+      "severity": "loud",
+      "announced": [],
+      "inSource": [],
+      "files": [],
+      "compareUrl": "https://github.com/react/react/compare/v18.3.1...v19.2.8",
+      "commits": 5979,
+      "filesChanged": 300,
+      "truncated": true
+    },
+    {
+      "package": "eslint",
+      "role": "reference",
+      "note": "Flat config became the only format. A repo with .eslintrc and no eslint.config.js does not lint with different rules \u2014 it does not lint at all. This repo has neither file and does not depend on eslint.",
+      "repo": "eslint/eslint",
+      "pinned": "8.57.0",
+      "latest": "10.9.1",
+      "majorsBehind": 2,
+      "daysSincePinned": 918,
+      "breakAvailableSince": "2024-04-05T20:53:31.118Z",
+      "severity": "loud",
+      "announced": [
+        {
+          "tag": "v9.6.0",
+          "url": "https://github.com/eslint/eslint/releases/tag/v9.6.0",
+          "quote": "* [`3379164`](https://github.com/eslint/eslint/commit/3379164e8b0cee57caf7da34226982075ebef51a) chore: remove `.eslintrc.js` (#18011) (\u552f\u7136)"
+        }
+      ],
+      "inSource": [
+        {
+          "file": ".eslintignore",
+          "symbol": ".eslintrc",
+          "lines": [
+            "-!.eslintrc.js"
+          ],
+          "kind": "code"
+        }
+      ],
+      "files": [],
+      "compareUrl": "https://github.com/eslint/eslint/compare/v8.57.0...v10.9.1",
+      "commits": 1760,
+      "filesChanged": 300,
+      "truncated": true
+    }
+  ];
+
+/** The three dependency proofs, captured verbatim from a real `pnpm oss:proof`. */
+const OSS_PROOFS: OssProof[] = [
+    {
+      "package": "express",
+      "repo": "expressjs/express",
+      "symbol": "res.send",
+      "severity": "silent",
+      "before": {
+        "version": "4.19.2",
+        "observed": "HTTP 404",
+        "detail": "res.send(404) replied 404 with body \"Not Found\"",
+        "healthy": true
+      },
+      "after": {
+        "version": "5.2.1",
+        "observed": "HTTP 200",
+        "detail": "res.send(404) replied 200 with body \"404\"",
+        "healthy": false
+      },
+      "probe": "",
+      "at": "2026-08-30T00:44:38.301Z"
+    },
+    {
+      "package": "react-dom",
+      "repo": "facebook/react",
+      "symbol": "ReactDOM.render",
+      "severity": "loud",
+      "before": {
+        "version": "18.3.1",
+        "observed": "ReactDOM.render exists",
+        "detail": "the legacy mount API is callable",
+        "healthy": true
+      },
+      "after": {
+        "version": "19.2.8",
+        "observed": "ReactDOM.render is undefined",
+        "detail": "removed \u2014 react-dom now exports: createPortal, flushSync, preconnect, prefetchDNS, preinit, preinitModule, preload, preloadModule, requestFormReset, unstable_batchedUpdates, useFormState, useFormStatus, version",
+        "healthy": false
+      },
+      "probe": "",
+      "at": "2026-08-30T00:44:38.612Z"
+    },
+    {
+      "package": "eslint",
+      "repo": "eslint/eslint",
+      "symbol": ".eslintrc",
+      "severity": "loud",
+      "before": {
+        "version": "8.57.0",
+        "observed": ".eslintrc.json was read",
+        "detail": "linted the file and reported no-unused-vars, so the config applied",
+        "healthy": true
+      },
+      "after": {
+        "version": "10.9.1",
+        "observed": ".eslintrc.json was ignored",
+        "detail": "ESLint couldn't find an eslint",
+        "healthy": false
+      },
+      "probe": "",
+      "at": "2026-08-30T00:44:39.699Z"
+    }
+  ];
+
 const STORE_KEY = "upstream-watch.mock";
 
 interface MockState { step: number; before?: RunResult; after?: RunResult }
@@ -307,6 +550,20 @@ export class MockAdapter implements Adapter {
     const row = VENDORS.find((v) => v.vendor === vendor);
     if (!row) throw new WatchlistError(`${vendor} is not on the watchlist`);
     return row.result ?? { entries: row.entriesSeen, matches: [], breakingElsewhere: 0, at: new Date().toISOString() };
+  }
+
+  async listPackages(): Promise<PackageFinding[]> {
+    return PACKAGES;
+  }
+
+  async listOssProofs(): Promise<OssProof[]> {
+    return OSS_PROOFS;
+  }
+
+  async listCaptures(vendor: string): Promise<Captures> {
+    // The real captures of OpenAI's page are byte-identical: their layout has not moved.
+    // Inventing a difference here is exactly what PageDiff refuses to render.
+    return { vendor, differ: false };
   }
 
   hasLiveSession(): boolean {

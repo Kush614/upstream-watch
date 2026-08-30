@@ -7,6 +7,18 @@
  * built and rehearsed with no backend running.
  */
 
+/** How much attention a change deserves. Mirrors pipeline/src/lib/severity.ts. */
+export type Severity = "breaks" | "behaviour" | "fyi";
+
+/** When each thing happened, so the gap between fixed and shutdown can be shown honestly. */
+export interface Timeline {
+  announced?: string;
+  detected?: string;
+  fixed?: string;
+  merged?: string;
+  shutdown?: string;
+}
+
 export type Phase =
   | "idle"
   | "watching"
@@ -32,9 +44,18 @@ export interface UiEvent {
     files?: string[];
     tests?: { passed: number; failed: number; output?: string };
     pr?: { url: string; number: number };
-    review?: { url: string };
+    review?: { url: string; findings?: Array<{ title: string; status: "resolved" | "dismissed" | "open" }> };
     commit?: { sha: string; url: string };
     approvalId?: string;
+    /** How much attention this needs. Absent means we have not classified it yet. */
+    severity?: Severity;
+    /** One plain sentence, from the classifier — never written in the component. */
+    because?: string;
+    /** True when the shutdown date is behind us: not a warning, a diagnosis. */
+    alreadyPast?: boolean;
+    /** The symbol that matched, for the impact step. */
+    symbol?: string;
+    timeline?: Timeline;
   };
 }
 
@@ -63,6 +84,76 @@ export interface Citation {
   evidence: string;
   source: string;
   url?: string;
+}
+
+/**
+ * A watched open-source dependency.
+ *
+ * Mirrors `PackageFinding` in scripts/oss-check.ts. Three sources per package, kept
+ * separate rather than merged into a verdict, because where they disagree IS the finding.
+ */
+export interface PackageFinding {
+  package: string;
+  /** A finding about this repo, or a demonstration that explicitly is not one. */
+  role: "dependency" | "reference";
+  /** Why a reference is shown, and that it does not apply here. */
+  note?: string;
+  /** Declared symbols found in none of the watched files. */
+  unusedSymbols?: string[];
+  repo: string;
+  pinned: string;
+  latest: string;
+  majorsBehind: number;
+  daysSincePinned: number | null;
+  /** When the first major above the pin shipped — the day the break became reachable. */
+  breakAvailableSince: string | null;
+  /** `silent` means the old call still works and now means something else. */
+  severity: "silent" | "loud";
+  announced: Array<{ tag: string; url: string; quote: string }>;
+  inSource: Array<{ file: string; symbol: string; lines: string[]; kind: "code" | "docs" }>;
+  compareUrl?: string;
+  commits?: number;
+  filesChanged?: number;
+  /** True when GitHub capped the file list — "nothing found" then means "not fully looked". */
+  truncated?: boolean;
+  /** Set when the pin could not be parsed; never rendered as "up to date". */
+  unparseablePin?: string;
+  files: string[];
+  symbols?: string[];
+}
+
+/**
+ * One dependency break, proved by running both versions.
+ *
+ * Mirrors `OssProof` in scripts/oss-proof.ts. The two sides ran the SAME probe, which is
+ * what makes them comparable — running different code against each version would prove only
+ * that two different programs behave differently.
+ */
+export interface OssProof {
+  package: string;
+  repo: string;
+  symbol: string;
+  severity: "silent" | "loud";
+  before: OssSide;
+  after: OssSide;
+  /** The probe source, so the method can be read rather than trusted. */
+  probe: string;
+  at: string;
+}
+
+export interface OssSide {
+  version: string;
+  observed: string;
+  detail: string;
+  healthy: boolean;
+}
+
+/** Two captures of a vendor's page, and whether they actually differ. */
+export interface Captures {
+  vendor: string;
+  before?: { file: string; at: string; bytes: number };
+  after?: { file: string; at: string; bytes: number };
+  differ: boolean;
 }
 
 /** One vendor on the watchlist, and what the last look at it found. */
@@ -106,6 +197,15 @@ export interface Adapter {
   listVendors(): Promise<VendorRow[]>;
   /** Check one vendor for real. Never consumes state the agent still has to find. */
   checkVendor(vendor: string): Promise<VendorResult>;
+
+  /** Every watched dependency, read from its registry, its releases and its source. */
+  listPackages(): Promise<PackageFinding[]>;
+
+  /** What actually happened when both versions of each dependency were run. */
+  listOssProofs(): Promise<OssProof[]>;
+
+  /** The two most recent captures of a vendor's page. */
+  listCaptures(vendor: string): Promise<Captures>;
 
   /**
    * Whether there is a live agent session to talk to *right now*.

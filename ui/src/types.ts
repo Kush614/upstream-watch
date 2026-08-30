@@ -19,6 +19,13 @@ export interface Step {
 }
 
 export interface ChangelogExcerpt {
+  /**
+   * The day the thing stops working, when the vendor published one.
+   *
+   * Distinct from `date`, which is only when the entry was written. Conflating them made
+   * every historical entry read as "already broken" as of its own publication date.
+   */
+  shutdown?: string;
   vendor: string;
   date: string;
   title: string;

@@ -4,7 +4,16 @@ import { daysAgo, type Phase } from "../adapter.ts";
  * Always visible, top-right. Four states, one line, no jargon — this is the whole story
  * for anyone who reads nothing else on the page.
  */
-export function StatusHeader({ phase, shutdownDate }: { phase: Phase; shutdownDate?: string }) {
+export function StatusHeader({
+  phase,
+  shutdownDate,
+  counts,
+}: {
+  phase: Phase;
+  shutdownDate?: string;
+  /** "1 breaking now · 2 FYI" — what needs attention, before what the agent is doing. */
+  counts?: string;
+}) {
   const days = shutdownDate ? daysAgo(shutdownDate) : 0;
 
   const { icon, text, tone } = (() => {
@@ -13,7 +22,9 @@ export function StatusHeader({ phase, shutdownDate }: { phase: Phase; shutdownDa
       case "testing":
         return {
           icon: "▲",
-          text: shutdownDate ? `Broke on ${shutdownDate} · ${days} days ago` : "Something changed",
+          // The count leads. "Something changed" tells a reader nothing about whether to
+          // stop what they are doing; "1 breaking now" does.
+          text: counts || (shutdownDate ? `Broke on ${shutdownDate} · ${days} days ago` : "Something changed"),
           tone: "text-warn border-warn",
         };
       case "awaiting_approval":

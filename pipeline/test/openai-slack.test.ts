@@ -115,3 +115,21 @@ describe("slack — schema.org JSON-LD via embedded-json", () => {
     expect(entries.some((e) => classify(e, spec.breaking_hint, []).breaking)).toBe(true);
   });
 });
+
+describe("only a deprecations table publishes a deadline", () => {
+  it("gives OpenAI's rows a shutdown date, because that column is one", async () => {
+    const entries = extractEntries(await capture("openai"), await loadSpec("openai"));
+
+    // Their table is "<shutdown date> | <deprecated> | <replacement>", declared as
+    // date_is_shutdown in SKILL.md.
+    expect(entries.every((e) => e.shutdown === e.date)).toBe(true);
+  });
+
+  it("gives a changelog's entries no deadline at all", async () => {
+    const entries = extractEntries(await capture("slack"), await loadSpec("slack"));
+
+    // Slack publishes a changelog. Its dates say when something was written, and copying
+    // them into `shutdown` would tell every reader their service broke that day.
+    expect(entries.some((e) => e.shutdown !== undefined)).toBe(false);
+  });
+});
