@@ -65,6 +65,32 @@ export interface Citation {
   url?: string;
 }
 
+/**
+ * A watched open-source dependency.
+ *
+ * Mirrors `PackageFinding` in scripts/oss-check.ts. Three sources per package, kept
+ * separate rather than merged into a verdict, because where they disagree IS the finding.
+ */
+export interface PackageFinding {
+  package: string;
+  repo: string;
+  pinned: string;
+  latest: string;
+  majorsBehind: number;
+  daysSincePinned: number | null;
+  /** When the first major above the pin shipped — the day the break became reachable. */
+  breakAvailableSince: string | null;
+  /** `silent` means the old call still works and now means something else. */
+  severity: "silent" | "loud";
+  announced: Array<{ tag: string; url: string; quote: string }>;
+  inSource: Array<{ file: string; symbol: string; lines: string[]; kind: "code" | "docs" }>;
+  compareUrl?: string;
+  commits?: number;
+  filesChanged?: number;
+  files: string[];
+  symbols?: string[];
+}
+
 /** One vendor on the watchlist, and what the last look at it found. */
 export interface VendorRow {
   vendor: string;
@@ -106,6 +132,9 @@ export interface Adapter {
   listVendors(): Promise<VendorRow[]>;
   /** Check one vendor for real. Never consumes state the agent still has to find. */
   checkVendor(vendor: string): Promise<VendorResult>;
+
+  /** Every watched dependency, read from its registry, its releases and its source. */
+  listPackages(): Promise<PackageFinding[]>;
 
   /**
    * Whether there is a live agent session to talk to *right now*.

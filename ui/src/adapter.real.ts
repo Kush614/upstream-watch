@@ -6,7 +6,7 @@
  * sentences the screen shows, and calls a small local runner for the before/after proof.
  */
 
-import type { Adapter, Phase, RunChunk, RunResult, UiEvent, VendorResult, VendorRow } from "./adapter.ts";
+import type { Adapter, PackageFinding, Phase, RunChunk, RunResult, UiEvent, VendorResult, VendorRow } from "./adapter.ts";
 
 /** The proof runner is a separate service; its failures should be distinguishable. */
 export class ProofRunnerError extends Error {
@@ -244,6 +244,16 @@ class RealAdapter implements Adapter {
       throw new ProofRunnerError(body.error ?? `check ${vendor} -> ${res.status}`, res.status);
     }
     return ((await res.json()) as { result: VendorResult }).result;
+  }
+
+  async listPackages(): Promise<PackageFinding[]> {
+    const res = await fetch(`${RUNNER}/packages`);
+    if (!res.ok) {
+      // An empty dependency tree would read as "nothing to worry about", which is the
+      // opposite of what an unreachable runner actually tells you.
+      throw new ProofRunnerError(`/packages -> ${res.status} ${res.statusText}`, res.status);
+    }
+    return ((await res.json()) as { packages: PackageFinding[] }).packages;
   }
 
   hasLiveSession(): boolean {
