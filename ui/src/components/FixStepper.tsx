@@ -56,7 +56,7 @@ const Quote = ({ children }: { children: React.ReactNode }) => (
   </pre>
 );
 
-export function FixStepper({ detail }: { detail: Detail }) {
+export function FixStepper({ detail, proved }: { detail: Detail; proved?: boolean }) {
   const { changelog, symbol, files, diff, tests, review, vendor } = detail;
   const failed = tests?.failed ?? 0;
 
@@ -139,7 +139,12 @@ export function FixStepper({ detail }: { detail: Detail }) {
             <p className={`text-[13px] ${failed > 0 ? "text-bad" : "text-ok"}`}>
               {failed > 0
                 ? `${failed} test${failed === 1 ? "" : "s"} still failing. This is not ready to merge.`
-                : `${tests.passed} tests pass against the live upstream.`}
+                : /* Only the proof run calls the upstream. The patch's own suite passing is
+                     ordinary success, and presenting it as external compatibility evidence
+                     is the claim this whole screen exists to refuse. */
+                  proved
+                  ? `${tests.passed} tests pass, checked against the live upstream — which still refuses the old call.`
+                  : `${tests.passed} tests pass. Nothing here called the vendor, so this says nothing about how they behave.`}
             </p>
             {tests.output && <Quote>{tests.output.split("\n").slice(-8).join("\n")}</Quote>}
           </div>

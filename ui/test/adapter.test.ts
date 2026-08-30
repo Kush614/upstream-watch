@@ -299,3 +299,43 @@ describe("severity and the timeline", () => {
     expect(t.shutdown! < t.merged!).toBe(true);
   });
 });
+
+describe("a deadline is read, never inferred", () => {
+  it("does not turn a publication date into a shutdown date", async () => {
+    const { toUiEventForTest } = await import("../src/adapter.real.ts");
+
+    const state = {
+      connected: true, source: "trueforge" as const, vendors: [], steps: [], done: [],
+      pending: [{
+        id: "t::c", vendor: "cloudflare", diff: "", files: [], testsPassed: null, testOutput: "",
+        // A changelog entry, published on a date. No shutdown column anywhere.
+        entry: { vendor: "cloudflare", date: "2026-08-01", title: "Cache Rules", body: "x", url: "u", breaking: true },
+      }],
+      summary: { lastCheck: "2026-08-29T00:00:00Z", eventsSeen: 1, prsOpened: 0, prsMerged: 0, pendingApprovals: 1 },
+    };
+
+    const { detail } = toUiEventForTest(state as never);
+    expect(detail?.shutdownDate).toBeUndefined();
+    expect(detail?.timeline?.shutdown).toBeUndefined();
+    // Without a deadline there is no "already happened" to claim.
+    expect(detail?.alreadyPast).toBeFalsy();
+  });
+
+  it("does not stand in numbers for a test run it did not measure", async () => {
+    const { toUiEventForTest } = await import("../src/adapter.real.ts");
+
+    const state = {
+      connected: true, source: "trueforge" as const, vendors: [], steps: [], done: [],
+      pending: [{
+        id: "t::c", vendor: "openai", diff: "", files: [], testsPassed: true,
+        // The runner said it passed but printed no vitest summary.
+        testOutput: "everything is fine",
+        entry: { vendor: "openai", date: "2026-07-23", title: "x", body: "y", url: "u", breaking: true },
+      }],
+      summary: { lastCheck: "2026-08-29T00:00:00Z", eventsSeen: 1, prsOpened: 0, prsMerged: 0, pendingApprovals: 1 },
+    };
+
+    // 12/0 and 9/3 were literals standing in for a boolean, sitting above the approve button.
+    expect(toUiEventForTest(state as never).detail?.tests).toBeUndefined();
+  });
+});

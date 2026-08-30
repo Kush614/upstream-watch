@@ -107,7 +107,10 @@ export async function buildPr(input: {
   const verdict = classify({
     touchesUs: event.relevance === "symbol-match",
     breaking: event.breaking,
-    shutdown: entry.date,
+    // entry.date is when they wrote it down; entry.shutdown is when it stops working, and
+    // only the second is a deadline. Passing the first labelled every historical entry
+    // "Breaking now" as of its own publication date.
+    shutdown: entry.shutdown,
     symbol: event.symbols[0],
     vendor: entry.vendor,
   });

@@ -9,8 +9,10 @@ import type { UiEvent } from "../adapter.ts";
  * Plain language, no jargon in the default view: "safe copy", "code review", "the fix" —
  * the technical words live behind "Changes ▾" for anyone who wants them.
  */
-export function NeedsYou({ detail, onApprove, onReject, busy }: {
+export function NeedsYou({ detail, onApprove, onReject, busy, proved }: {
   detail: NonNullable<UiEvent["detail"]>;
+  /** True only when a before/after run actually called the upstream. */
+  proved?: boolean;
   onApprove: () => void;
   onReject: (reason: string) => void;
   busy: boolean;
@@ -59,7 +61,7 @@ export function NeedsYou({ detail, onApprove, onReject, busy }: {
         )}
       </p>
 
-      <FixStepper detail={detail} />
+      <FixStepper detail={detail} proved={proved} />
 
       <div className="mt-5 flex flex-wrap items-center gap-2.5">
         {rejecting ? (

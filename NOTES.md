@@ -801,3 +801,42 @@ Not borrowed, deliberately: chat-first layouts, node graphs, and Dependabot's no
 volume. FYI changes never open a PR or raise a card — a real OpenAI run has 86 breaking
 entries and one that touches us, and treating all 86 as urgent is how a watcher becomes the
 thing everyone ignores.
+
+## 2026-08-30 — A publication date is not a deadline
+
+The worst bug in this project so far, and the one that best explains why it exists.
+
+`ChangelogEntry.date` is when the vendor *wrote the entry*. I used it everywhere a shutdown
+date was wanted — in `classify`, in `severityFor`, in `timelineFor`. The reason is
+embarrassing and instructive: on OpenAI's deprecations table those two things are the same
+column, and I had been staring at that one page for hours.
+
+What it produced: every dated changelog entry read as **"Breaking now, since \<the day they
+published it\>"**, with a "days exposed" figure counted from a deadline the vendor never
+set. A Cloudflare changelog entry from three weeks ago would have opened a PR announcing
+that your service had been broken for three weeks. The tool would have been doing, loudly
+and with a receipt, exactly the thing it exists to prevent.
+
+`entry.shutdown` is now a separate optional field, set only by an extraction spec that reads
+a real shutdown column. Absent means *we do not know of a deadline*, which is different from
+there being none and different again from the deadline being today. Without one the PR says
+"Breaking change", the timeline shows the steps and no exposure figure, and nothing claims
+anything already happened.
+
+**Two more from the same review, same shape.**
+
+`adapter.real.ts` synthesised test counts from a boolean: `passed: testsPassed ? 12 : 9,
+failed: testsPassed ? 0 : 3`. Those numbers came from nowhere — no run produced them — and
+they rendered directly above the approve button. They are now read from the runner's own
+vitest summary, and absent when there is no summary to read.
+
+The stepper said passing tests ran *"against the live upstream"*. They did not: that is the
+patch's own suite, and only the before/after proof calls the vendor. Ordinary suite success
+presented as external compatibility evidence is precisely the claim this screen exists to
+refuse. It now says so only when a proof actually ran, and otherwise states plainly that
+nothing here called the vendor.
+
+**Lesson.** Every one of these is the same failure in a new place: a value that means one
+thing being used as though it meant a stronger thing. Absent counts as good, a publication
+date as a deadline, a local test as a vendor check. The correction is always the same shape
+too — carry the weaker fact honestly, and let the screen say less.

@@ -77,7 +77,9 @@ function toUiEvent(state: SessionState): UiEvent {
     at: state.summary.lastCheck ?? new Date().toISOString(),
     detail: {
       vendor: pending?.entry.vendor ?? state.vendors[0]?.vendor,
-      shutdownDate: pending?.entry.date,
+      // Only a published deadline. entry.date is when the vendor wrote the entry, and
+      // treating it as a shutdown date made every historical entry read as already broken.
+      shutdownDate: pending?.entry.shutdown,
       changelog: pending
         ? {
             title: pending.entry.title,
@@ -89,16 +91,38 @@ function toUiEvent(state: SessionState): UiEvent {
         : undefined,
       diff: pending?.diff || undefined,
       files: pending?.files,
-      tests:
-        pending?.testsPassed === null || pending === undefined
-          ? undefined
-          : { passed: pending.testsPassed ? 12 : 9, failed: pending.testsPassed ? 0 : 3, output: pending.testOutput },
+      // Counts read from the runner's own summary. The previous version returned literal
+      // 12/9 and 0/3 depending on a boolean — numbers no run produced, sitting directly
+      // above the approval button as though they were measurements.
+      tests: testsFrom(pending),
       pr: pr?.prNumber ? { url: pr.prUrl, number: pr.prNumber } : undefined,
       commit: undefined,
       approvalId: pending?.id,
       ...severityFor(pending),
       timeline: timelineFor(pending, pr, state),
     },
+  };
+}
+
+/**
+ * Test counts, read from the output rather than stood in for.
+ *
+ * Returns undefined when the run printed no summary: "0 passed, 0 failed" would dress an
+ * unmeasured run as a clean one, and this sits above the only irreversible button here.
+ */
+function testsFrom(
+  pending: SessionState["pending"][number] | undefined,
+): { passed: number; failed: number; output?: string } | undefined {
+  if (!pending || pending.testsPassed === null) return undefined;
+
+  const clean = (pending.testOutput ?? "").replace(/\u001b\[[0-9;]*m/g, "");
+  const line = /^\s*Tests\s+(.+)$/m.exec(clean)?.[1];
+  if (!line) return undefined;
+
+  return {
+    passed: Number(/(\d+) passed/.exec(line)?.[1] ?? 0),
+    failed: Number(/(\d+) failed/.exec(line)?.[1] ?? 0),
+    output: pending.testOutput,
   };
 }
 
@@ -115,7 +139,8 @@ function severityFor(
   if (!pending) return {};
 
   const symbol = pending.entry.title.replace(/`/g, "").trim() || undefined;
-  const date = pending.entry.date;
+  // The published deadline, if there is one. Never the entry's own date.
+  const date = pending.entry.shutdown;
   const past = date ? Date.parse(`${date}T00:00:00Z`) <= Date.now() : false;
   const what = symbol ? `\`${symbol}\`` : "something this repo calls";
 
@@ -147,7 +172,9 @@ function timelineFor(
     detected: day(state.summary.lastCheck),
     fixed: pending?.testsPassed ? day(state.summary.lastCheck) : undefined,
     merged: pr?.status === "merged" ? day(pr.at) : undefined,
-    shutdown: pending?.entry.date,
+    // Absent unless the vendor published one. Without it the timeline shows the steps and
+    // no exposure figure, which is the honest rendering of "we do not know of a deadline".
+    shutdown: pending?.entry.shutdown,
   };
 }
 

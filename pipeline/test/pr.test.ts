@@ -50,8 +50,10 @@ describe("buildPr", () => {
     const pr = await buildPr({ event: event(), patch, provenance: "live" });
 
     // The verdict leads: "breaking now" and "FYI" are different asks of a reviewer, and
-    // they should know which before reading anything else.
-    expect(pr.body).toContain("## Breaking now, since 2026-08-26");
+    // they should know which before reading anything else. This entry carries no published
+    // shutdown date, so the heading must not invent one from the publication date.
+    expect(pr.body).toContain("## Breaking change");
+    expect(pr.body).not.toContain("Breaking now");
     expect(pr.body).toContain("`demo-app/src/payments.ts`");
     expect(pr.body).toContain("Tests 14 passed");
     expect(pr.body).toContain("merge requires approval in the TrueForge session");
@@ -158,5 +160,27 @@ describe("what the PR body will and will not claim", () => {
       passed: true,
     });
     expect(proved).toMatch(/already refuses the old call/);
+  });
+});
+
+describe("a deadline is read, never inferred", () => {
+  it("says Breaking change when the vendor published no shutdown date", async () => {
+    const pr = await buildPr({ event: event(), patch, provenance: "live" });
+
+    // entry.date is when they wrote it down. Treating it as a deadline labelled every
+    // historical entry "Breaking now" as of its own publication date, and produced a
+    // "days exposed" figure counted from a deadline nobody set.
+    expect(pr.body).toContain("## Breaking change");
+  });
+
+  it("says Breaking now only when a real shutdown date has passed", async () => {
+    const e = event();
+    const withDeadline = {
+      ...e,
+      entry: { ...e.entry, date: "2026-07-23", shutdown: "2026-07-23" },
+    };
+
+    const pr = await buildPr({ event: withDeadline, patch, provenance: "live" });
+    expect(pr.body).toContain("## Breaking now, since 2026-07-23");
   });
 });
