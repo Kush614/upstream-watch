@@ -20,7 +20,31 @@
       "failed": 2,
       "output": "    110|       });\n    111| \n    112|       if (!res.ok) throw new Error(`OpenAI risk check failed: ${res.st…\n       |                          ^\n    113| \n    114|       const text = responseText((await res.json()) as OpenAIResponseBo…\n ❯ test/vendor-live.test.ts:31:24\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\n\n FAIL  test/vendors.test.ts > OpenAI risk check > uses the model this service is pinned to\nAssertionError: expected 'gpt-5.1-codex-mini' to be 'gpt-5.6-terra' // Object.is equality\n\nExpected: \"gpt-5.6-terra\"\nReceived: \"gpt-5.1-codex-mini\"\n\n ❯ test/vendors.test.ts:9:24\n      7|     // Pinned deliberately: OpenAI publishes a shutdown date for this …\n      8|     // deprecation lands this assertion is what has to change alongsid…\n      9|     expect(RISK_MODEL).toBe(\"gpt-5.6-terra\");\n       |                        ^\n     10|   });\n     11| \n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯"
     },
-    "at": "2026-08-30T00:02:44.467Z"
+    "citations": [
+      {
+        "claim": "OpenAI retired gpt-5.1-codex-mini on 2026-07-23.",
+        "evidence": "July 23, 2026`gpt-5.1-codex-mini``gpt-5.6-terra`",
+        "source": "Scraped live from OpenAI's deprecations page during this run.",
+        "url": "https://platform.openai.com/docs/deprecations"
+      },
+      {
+        "claim": "This commit asks for gpt-5.1-codex-mini.",
+        "evidence": "export const RISK_MODEL = \"gpt-5.1-codex-mini\";",
+        "source": "Read out of commit 279441b — demo-app/src/risk.ts, not from anything typed here."
+      },
+      {
+        "claim": "OpenAI refused the request with 404.",
+        "evidence": "404 — Model not found gpt-5.1-codex-mini",
+        "source": "The reply to the POST this commit's own test sent to https://api.openai.com/v1/responses.",
+        "url": "https://api.openai.com/v1/responses"
+      },
+      {
+        "claim": "2 of this service's tests fail as a result.",
+        "evidence": "21 passed, 2 failed",
+        "source": "vitest, run against commit 279441b with today's test suite — the before column."
+      }
+    ],
+    "at": "2026-08-30T00:20:08.732Z"
   },
   "after": {
     "side": "after",
@@ -36,12 +60,36 @@
     },
     "changedKey": "model",
     "status": 200,
-    "responseExcerpt": "200 — {\n  \"id\": \"resp_00a8d6433f676799016a93732428f087d09a62bcc30ac1a9ae\",\n  \"object\": \"response\",\n  \"created_at\": 1788048164,\n  \"status\": \"completed\",\n  \"background\": false,\n  \"billing\": {\n    \"payer\": \"developer\"\n  },\n  \"completed_at\": 1788048165,\n  \"error\": null,\n  \"frequency_penalty\": 0.0,\n  \"incomplete_details\": null,\n  \"instructions\": null,\n  \"max_output_tokens\": null,\n  \"max_tool_calls\": null,\n  ",
+    "responseExcerpt": "200 — {\n  \"id\": \"resp_057003925e628e7a016a93773896b887d0bc17579324a589d8\",\n  \"object\": \"response\",\n  \"created_at\": 1788049208,\n  \"status\": \"completed\",\n  \"background\": false,\n  \"billing\": {\n    \"payer\": \"developer\"\n  },\n  \"completed_at\": 1788049209,\n  \"error\": null,\n  \"frequency_penalty\": 0.0,\n  \"incomplete_details\": null,\n  \"instructions\": null,\n  \"max_output_tokens\": null,\n  \"max_tool_calls\": null,\n  ",
     "tests": {
       "passed": 23,
       "failed": 0,
-      "output": "> demo-app@0.1.0 test /private/var/folders/rl/rxv___wj1sx2l4416vcf9dsc0000gn/T/uw-proof-CoJoFd/demo-app\n> vitest run\n\n\n RUN  v2.1.9 /private/var/folders/rl/rxv___wj1sx2l4416vcf9dsc0000gn/T/uw-proof-CoJoFd/demo-app\n\n ✓ test/vendors.test.ts (6 tests) 4ms\n ✓ test/cdn.test.ts (2 tests) 4ms\n ✓ test/payments.test.ts (14 tests) 29ms\n ✓ test/vendor-live.test.ts (1 test) 1477ms\n   ✓ risk check against the real OpenAI API > gets a risk assessment back 1476ms\n\n Test Files  4 passed (4)\n      Tests  23 passed (23)\n   Start at  17:02:43\n   Duration  1.98s (transform 89ms, setup 0ms, collect 279ms, tests 1.51s, environment 0ms, prepare 442ms)"
+      "output": "> demo-app@0.1.0 test /private/var/folders/rl/rxv___wj1sx2l4416vcf9dsc0000gn/T/uw-proof-hOdOrx/demo-app\n> vitest run\n\n\n RUN  v2.1.9 /private/var/folders/rl/rxv___wj1sx2l4416vcf9dsc0000gn/T/uw-proof-hOdOrx/demo-app\n\n ✓ test/cdn.test.ts (2 tests) 4ms\n ✓ test/vendors.test.ts (6 tests) 6ms\n ✓ test/payments.test.ts (14 tests) 27ms\n ✓ test/vendor-live.test.ts (1 test) 1709ms\n   ✓ risk check against the real OpenAI API > gets a risk assessment back 1708ms\n\n Test Files  4 passed (4)\n      Tests  23 passed (23)\n   Start at  17:20:07\n   Duration  2.32s (transform 192ms, setup 0ms, collect 415ms, tests 1.75s, environment 0ms, prepare 478ms)"
     },
-    "at": "2026-08-30T00:02:45.409Z"
+    "citations": [
+      {
+        "claim": "OpenAI retired gpt-5.1-codex-mini on 2026-07-23.",
+        "evidence": "July 23, 2026`gpt-5.1-codex-mini``gpt-5.6-terra`",
+        "source": "Scraped live from OpenAI's deprecations page during this run.",
+        "url": "https://platform.openai.com/docs/deprecations"
+      },
+      {
+        "claim": "This commit asks for gpt-5.6-terra.",
+        "evidence": "export const RISK_MODEL = \"gpt-5.6-terra\";",
+        "source": "Read out of commit 9c1d01a — demo-app/src/risk.ts, not from anything typed here."
+      },
+      {
+        "claim": "OpenAI accepted the request.",
+        "evidence": "200 — {\n  \"id\": \"resp_057003925e628e7a016a93773896b887d0bc17579324a589d8\",\n  \"object\": \"response\",\n  \"created_at\": 1788049208,\n  \"status\": \"completed\",\n  \"background\": false,\n  \"billing\": {\n    \"payer\": \"developer\"\n  },\n  \"completed_at\": 1788049209,\n  \"error\": null,\n  \"frequency_penalty\": 0.0,\n  \"incomplete_details\": null,\n  \"instructions\": null,\n  \"max_output_tokens\": null,\n  \"max_tool_calls\": null,\n  ",
+        "source": "The reply to the POST this commit's own test sent to https://api.openai.com/v1/responses.",
+        "url": "https://api.openai.com/v1/responses"
+      },
+      {
+        "claim": "All 23 of this service's tests pass.",
+        "evidence": "23 passed, 0 failed",
+        "source": "vitest, run against commit 9c1d01a with today's test suite — the after column."
+      }
+    ],
+    "at": "2026-08-30T00:20:10.084Z"
   }
 }

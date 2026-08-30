@@ -82,7 +82,7 @@ export interface VendorRow {
 
 export interface VendorResult {
   entries: number;
-  matches: Array<{ date: string; title: string; url: string; relevance: string; files: string[] }>;
+  matches: Array<{ date: string; title: string; body: string; url: string; relevance: string; files: string[] }>;
   breakingElsewhere: number;
   failed?: string;
   at: string;
