@@ -14,9 +14,29 @@ import type { Captures } from "../adapter.ts";
  */
 export function PageDiff({ captures, runner }: { captures?: Captures; runner: string }) {
   const [at, setAt] = useState(50);
+  const [width, setWidth] = useState(0);
   const frame = useRef<HTMLDivElement>(null);
 
   useEffect(() => setAt(50), [captures?.before?.file, captures?.after?.file]);
+
+  // The overlay must be as wide as the FRAME, not as wide as its clip, or the two pages do
+  // not line up. Reading frame.current during render gives 0 — the ref is null on the first
+  // pass — so the width is measured after mount and kept in sync with resizes.
+  useEffect(() => {
+    const el = frame.current;
+    if (!el) return;
+
+    const measure = () => setWidth(el.clientWidth);
+    measure();
+
+    // Guarded: jsdom and older browsers have no ResizeObserver, and losing the observer
+    // should cost a resize refit, not the whole component.
+    if (typeof ResizeObserver !== "function") return;
+
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [captures?.before?.file]);
 
   if (!captures?.before || !captures.after) return null;
 
@@ -50,9 +70,7 @@ export function PageDiff({ captures, runner }: { captures?: Captures; runner: st
             title={`${captures.vendor} after`}
             src={src(captures.after.file)}
             sandbox=""
-            /* Fixed to the frame's width, not the clip's, so the page underneath does not
-               reflow as the divider moves — otherwise the two sides never line up. */
-            style={{ width: frame.current?.clientWidth ?? 0 }}
+            style={{ width }}
             className="absolute inset-y-0 left-0 h-full bg-white"
           />
         </div>

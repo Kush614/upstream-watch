@@ -56,3 +56,16 @@ describe("daysPast", () => {
     expect(daysPast("2026-12-11", NOW)).toBe(-103);
   });
 });
+
+describe("a deadline only exists where the page publishes one", () => {
+  it("does not treat a changelog's publication date as a shutdown", () => {
+    // The entry a changelog produces: a date, and no deadline anywhere on the page.
+    const v = classify({ touchesUs: true, breaking: true, symbol: "purge_cache" }, NOW);
+
+    expect(v.severity).toBe("breaks");
+    // No date, so nothing can have "already happened".
+    expect(v.shutdown).toBeUndefined();
+    expect(v.alreadyPast).toBeUndefined();
+    expect(v.because).not.toMatch(/already happened/);
+  });
+});

@@ -81,6 +81,11 @@ vendors:
     url: https://platform.openai.com/docs/deprecations
     strategy: css
     entry_selector: "table tbody tr"
+    # This vendor's date column is a SHUTDOWN date, not a publication date. Almost every
+    # other source we watch is a changelog, where the date is only when the entry was
+    # written — so the meaning has to be declared per vendor rather than assumed. Without
+    # this flag a dated entry produces no deadline, and nothing claims anything has broken.
+    date_is_shutdown: true
     fields:
       date:  "td:nth-child(1)"        # "Jan 20, 2027" -> normalised to ISO
       title: "td:nth-child(2)"        # the deprecated model or API

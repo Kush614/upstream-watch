@@ -51,9 +51,9 @@ export function App() {
     void adapter.listVendors().then(setVendors).catch(surface);
     void adapter.listPackages().then(setPackages).catch(surface);
     void adapter.listOssProofs().then(setOssProofs).catch(surface);
-    // Captures are per vendor and only interesting when the page moved; a failure here is
-    // not worth an alert, because the absence of a redesign is the normal case.
-    void adapter.listCaptures("openai").then(setCaptures).catch(() => undefined);
+    // Captures belong to the vendor this run is about. Hardcoding one meant a Cloudflare
+    // run showed OpenAI's page under the heading "their page changed".
+
 
     return adapter.subscribe((e) => setEvents((prev) => [...prev, e]));
   }, []);
@@ -61,6 +61,14 @@ export function App() {
   const phase = currentPhase(events);
   const detail = useMemo(() => mergedDetail(events), [events]);
   const counts = useMemo(() => countsLine(events), [events]);
+
+  // Captures belong to the vendor THIS run is about. Hardcoding one meant a Cloudflare run
+  // would show OpenAI's page under the heading "their page changed". A failure is not worth
+  // an alert: the absence of a redesign is the normal case.
+  useEffect(() => {
+    if (!detail.vendor) return;
+    void adapter.listCaptures(detail.vendor).then(setCaptures).catch(() => undefined);
+  }, [detail.vendor]);
 
   // One chord when the problem appears, one when it is gone.
   useEffect(() => {

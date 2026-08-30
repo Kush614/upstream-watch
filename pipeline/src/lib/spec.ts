@@ -48,6 +48,8 @@ function normaliseSpec(vendor: string, raw: Record<string, unknown>): Extraction
     fields: raw.fields as ExtractionSpec["fields"],
     json: raw.json as ExtractionSpec["json"],
     breaking_default: raw.breaking_default === true,
+    // Whether this page's date column is a deadline or just a publication date.
+    date_is_shutdown: raw.date_is_shutdown === true,
     match_fields: Array.isArray(raw.match_fields)
       ? (raw.match_fields.filter((f) => f === "title" || f === "body") as Array<"title" | "body">)
       : undefined,

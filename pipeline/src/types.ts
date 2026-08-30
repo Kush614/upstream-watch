@@ -83,6 +83,14 @@ export interface MismatchStats {
 
 /** One vendor's extraction spec, from the YAML block in SKILL.md. */
 export interface ExtractionSpec {
+  /**
+   * True when this page's date column is the day the thing stops working.
+   *
+   * A deprecations table publishes deadlines; a changelog publishes publication dates, and
+   * the extracted entry looks the same either way. Declared per source because only the
+   * page can tell you which it is.
+   */
+  date_is_shutdown?: boolean;
   vendor: string;
   url: string;
   /**
@@ -153,6 +161,15 @@ export interface VendorTarget {
    * genuinely differ and every run should say so.
    */
   source?: "live" | "cache";
+  /**
+   * True when this vendor's entry date is the day the thing stops working.
+   *
+   * A deprecations table publishes deadlines; a changelog publishes publication dates. The
+   * two look identical in the extracted entry, and treating every date as a deadline made
+   * ordinary changelog entries read as "already broken since the day they were written".
+   * Declared per vendor because only the page can tell you which it is.
+   */
+  dateIsShutdown?: boolean;
 }
 
 export interface Targets {
