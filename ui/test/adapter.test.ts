@@ -172,3 +172,20 @@ describe("Watchlist and citations", () => {
     expect(answer).toMatch(/not running|cannot ask/i);
   });
 });
+
+describe("what the review caught on the watchlist", () => {
+  it("does not offer a conversation the frozen capture cannot have", async () => {
+    // Events on screen are not evidence of a live agent: offline they come from a capture.
+    const a = new MockAdapter();
+    a.reset();
+    for (let i = 0; i < 4; i++) a.advance();
+
+    expect((await a.history()).length).toBeGreaterThan(0);
+    expect(a.hasLiveSession()).toBe(false);
+  });
+
+  it("uses a typed error for a vendor it does not watch", async () => {
+    const { WatchlistError } = await import("../src/adapter.ts");
+    await expect(new MockAdapter().checkVendor("netflix")).rejects.toBeInstanceOf(WatchlistError);
+  });
+});

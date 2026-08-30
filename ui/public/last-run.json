@@ -2,40 +2,46 @@
   "emulatedDate": "2026-12-11",
   "before": {
     "side": "before",
-    "sha": "8cc13fe",
+    "sha": "279441b",
     "request": {
-      "model": "gpt-5-mini-2025-08-07",
-      "input": "Assess fraud risk for a card payment…",
-      "store": false
+      "method": "POST",
+      "url": "https://api.openai.com/v1/responses",
+      "body": {
+        "model": "gpt-5.1-codex-mini",
+        "input": "Assess fraud risk for a card payment.\n\nAmount: 42.00 USD\nCountry: GB\nCard ending: 4242\n\nAnswer with a level (low, medium or high) and one sentence of reasoning.",
+        "store": false
+      }
     },
     "changedKey": "model",
-    "status": 400,
-    "responseExcerpt": "The model `gpt-5-mini-2025-08-07` has been shut down. Learn more: https://platform.openai.com/docs/deprecations",
+    "status": 404,
+    "responseExcerpt": "404 — Model not found gpt-5.1-codex-mini",
     "tests": {
       "passed": 21,
       "failed": 2,
-      "output": "    \u001b[90m 50| \u001b[39m      })\u001b[33m;\u001b[39m\n    \u001b[90m 51| \u001b[39m\n    \u001b[90m 52| \u001b[39m      \u001b[35mif\u001b[39m (\u001b[33m!\u001b[39mres\u001b[33m.\u001b[39mok) \u001b[35mthrow\u001b[39m \u001b[35mnew\u001b[39m \u001b[33mError\u001b[39m(\u001b[32m`OpenAI risk check failed: \u001b[39m\u001b[36m${\u001b[39mres\u001b[33m.\u001b[39mst…\n    \u001b[90m   | \u001b[39m                         \u001b[31m^\u001b[39m\n    \u001b[90m 53| \u001b[39m\n    \u001b[90m 54| \u001b[39m      \u001b[35mconst\u001b[39m body \u001b[33m=\u001b[39m (\u001b[35mawait\u001b[39m res\u001b[33m.\u001b[39m\u001b[34mjson\u001b[39m()) \u001b[35mas\u001b[39m { choices\u001b[33m?\u001b[39m\u001b[33m:\u001b[39m \u001b[33mArray\u001b[39m\u001b[33m<\u001b[39m{ message\u001b[33m?\u001b[39m\u001b[33m:\u001b[39m…\n\u001b[90m \u001b[2m❯\u001b[22m test/vendor-live.test.ts:\u001b[2m19:24\u001b[22m\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\u001b[22m\u001b[39m\n\n\u001b[31m\u001b[1m\u001b[7m FAIL \u001b[27m\u001b[22m\u001b[39m test/vendors.test.ts\u001b[2m > \u001b[22mOpenAI risk check\u001b[2m > \u001b[22muses the model this service is pinned to\n\u001b[31m\u001b[1mAssertionError\u001b[22m: expected 'gpt-5-mini-2025-08-07' to be 'gpt-5.6-terra' // Object.is equality\u001b[39m\n\nExpected: \u001b[32m\"gpt-5\u001b[7m.6-terra\u001b[27m\"\u001b[39m\nReceived: \u001b[31m\"gpt-5\u001b[7m-mini-2025-08-07\u001b[27m\"\u001b[39m\n\n\u001b[36m \u001b[2m❯\u001b[22m test/vendors.test.ts:\u001b[2m9:24\u001b[22m\u001b[39m\n    \u001b[90m  7| \u001b[39m    \u001b[90m// Pinned deliberately: OpenAI publishes a shutdown date for this \u001b[39m…\n    \u001b[90m  8| \u001b[39m    \u001b[90m// deprecation lands this assertion is what has to change alongsid\u001b[39m…\n    \u001b[90m  9| \u001b[39m    \u001b[34mexpect\u001b[39m(\u001b[33mRISK_MODEL\u001b[39m)\u001b[33m.\u001b[39m\u001b[34mtoBe\u001b[39m(\u001b[32m\"gpt-5.6-terra\"\u001b[39m)\u001b[33m;\u001b[39m\n    \u001b[90m   | \u001b[39m                       \u001b[31m^\u001b[39m\n    \u001b[90m 10| \u001b[39m  })\u001b[33m;\u001b[39m\n    \u001b[90m 11| \u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯\u001b[22m\u001b[39m"
+      "output": "    110|       });\n    111| \n    112|       if (!res.ok) throw new Error(`OpenAI risk check failed: ${res.st…\n       |                          ^\n    113| \n    114|       const text = responseText((await res.json()) as OpenAIResponseBo…\n ❯ test/vendor-live.test.ts:31:24\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\n\n FAIL  test/vendors.test.ts > OpenAI risk check > uses the model this service is pinned to\nAssertionError: expected 'gpt-5.1-codex-mini' to be 'gpt-5.6-terra' // Object.is equality\n\nExpected: \"gpt-5.6-terra\"\nReceived: \"gpt-5.1-codex-mini\"\n\n ❯ test/vendors.test.ts:9:24\n      7|     // Pinned deliberately: OpenAI publishes a shutdown date for this …\n      8|     // deprecation lands this assertion is what has to change alongsid…\n      9|     expect(RISK_MODEL).toBe(\"gpt-5.6-terra\");\n       |                        ^\n     10|   });\n     11| \n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯"
     },
-    "emulatedDate": "2026-12-11",
-    "at": "2026-08-29T23:20:41.483Z"
+    "at": "2026-08-30T00:02:44.467Z"
   },
   "after": {
     "side": "after",
-    "sha": "f7c7372",
+    "sha": "9c1d01a",
     "request": {
-      "model": "gpt-5.6-terra",
-      "input": "Assess fraud risk for a card payment…",
-      "store": false
+      "method": "POST",
+      "url": "https://api.openai.com/v1/responses",
+      "body": {
+        "model": "gpt-5.6-terra",
+        "input": "Assess fraud risk for a card payment.\n\nAmount: 42.00 USD\nCountry: GB\nCard ending: 4242\n\nAnswer with a level (low, medium or high) and one sentence of reasoning.",
+        "store": false
+      }
     },
     "changedKey": "model",
     "status": 200,
-    "responseExcerpt": "{\"id\":\"resp_proof\",\"output_text\":\"low — small amount, familiar country\"}",
+    "responseExcerpt": "200 — {\n  \"id\": \"resp_00a8d6433f676799016a93732428f087d09a62bcc30ac1a9ae\",\n  \"object\": \"response\",\n  \"created_at\": 1788048164,\n  \"status\": \"completed\",\n  \"background\": false,\n  \"billing\": {\n    \"payer\": \"developer\"\n  },\n  \"completed_at\": 1788048165,\n  \"error\": null,\n  \"frequency_penalty\": 0.0,\n  \"incomplete_details\": null,\n  \"instructions\": null,\n  \"max_output_tokens\": null,\n  \"max_tool_calls\": null,\n  ",
     "tests": {
       "passed": 23,
       "failed": 0,
-      "output": "\u001b[1m\u001b[7m\u001b[36m RUN \u001b[39m\u001b[27m\u001b[22m \u001b[36mv2.1.9 \u001b[39m\u001b[90m/private/var/folders/rl/rxv___wj1sx2l4416vcf9dsc0000gn/T/uw-proof-mq0oY1/demo-app\u001b[39m\n\n \u001b[32m✓\u001b[39m test/cdn.test.ts \u001b[2m(\u001b[22m\u001b[2m2 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[90m 2\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m test/vendors.test.ts \u001b[2m(\u001b[22m\u001b[2m6 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[90m 3\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m test/vendor-live.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[90m 16\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m test/payments.test.ts \u001b[2m(\u001b[22m\u001b[2m14 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[90m 23\u001b[2mms\u001b[22m\u001b[39m\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[32m4 passed\u001b[39m\u001b[22m\u001b[90m (4)\u001b[39m\n\u001b[2m      Tests \u001b[22m \u001b[1m\u001b[32m23 passed\u001b[39m\u001b[22m\u001b[90m (23)\u001b[39m\n\u001b[2m   Start at \u001b[22m 16:20:41\n\u001b[2m   Duration \u001b[22m 331ms\u001b[2m (transform 90ms, setup 0ms, collect 174ms, tests 44ms, environment 1ms, prepare 211ms)\u001b[22m"
+      "output": "> demo-app@0.1.0 test /private/var/folders/rl/rxv___wj1sx2l4416vcf9dsc0000gn/T/uw-proof-CoJoFd/demo-app\n> vitest run\n\n\n RUN  v2.1.9 /private/var/folders/rl/rxv___wj1sx2l4416vcf9dsc0000gn/T/uw-proof-CoJoFd/demo-app\n\n ✓ test/vendors.test.ts (6 tests) 4ms\n ✓ test/cdn.test.ts (2 tests) 4ms\n ✓ test/payments.test.ts (14 tests) 29ms\n ✓ test/vendor-live.test.ts (1 test) 1477ms\n   ✓ risk check against the real OpenAI API > gets a risk assessment back 1476ms\n\n Test Files  4 passed (4)\n      Tests  23 passed (23)\n   Start at  17:02:43\n   Duration  1.98s (transform 89ms, setup 0ms, collect 279ms, tests 1.51s, environment 0ms, prepare 442ms)"
     },
-    "emulatedDate": "2026-12-11",
-    "at": "2026-08-29T23:20:42.340Z"
+    "at": "2026-08-30T00:02:45.409Z"
   }
 }

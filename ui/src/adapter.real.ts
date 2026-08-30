@@ -108,6 +108,7 @@ export const toUiEventForTest = toUiEvent;
 class RealAdapter implements Adapter {
   #sessionId?: string;
   #last?: UiEvent;
+  #live = false;
 
   async #state(): Promise<SessionState> {
     return loadSession(this.#sessionId);
@@ -121,6 +122,8 @@ class RealAdapter implements Adapter {
       try {
         const state = await this.#state();
         this.#sessionId = state.sessionId ?? this.#sessionId;
+        // Only a connected harness counts. The frozen capture also carries a session id.
+        this.#live = state.connected && state.source === "trueforge" && Boolean(this.#sessionId);
         const event = toUiEvent(state);
 
         // Speak when anything the screen renders changes. Comparing only phase and message
@@ -241,6 +244,10 @@ class RealAdapter implements Adapter {
       throw new ProofRunnerError(body.error ?? `check ${vendor} -> ${res.status}`, res.status);
     }
     return ((await res.json()) as { result: VendorResult }).result;
+  }
+
+  hasLiveSession(): boolean {
+    return this.#live;
   }
 
   async ask(question: string): Promise<string> {

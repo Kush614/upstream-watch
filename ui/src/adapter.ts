@@ -75,6 +75,8 @@ export interface VendorRow {
   files: string[];
   lastCheck: string | null;
   entriesSeen: number;
+  /** Set when persisted state exists but could not be read — never shown as "never". */
+  stateError?: string;
   result?: VendorResult;
 }
 
@@ -105,6 +107,13 @@ export interface Adapter {
   /** Check one vendor for real. Never consumes state the agent still has to find. */
   checkVendor(vendor: string): Promise<VendorResult>;
 
+  /**
+   * Whether there is a live agent session to talk to *right now*.
+   *
+   * Not "are there events on screen": offline the events come from a frozen capture, and
+   * enabling the composer against those offers a conversation that cannot happen.
+   */
+  hasLiveSession(): boolean;
   /** Ask the running agent a question, in its own session. */
   ask(question: string): Promise<string>;
 }
@@ -137,4 +146,18 @@ export function mergedDetail(events: UiEvent[]): NonNullable<UiEvent["detail"]> 
     }
   }
   return out as NonNullable<UiEvent["detail"]>;
+}
+
+/**
+ * A vendor could not be looked up.
+ *
+ * Typed because the caller has to tell "you asked for a vendor we do not watch" apart from
+ * "the runner is unreachable" — the first is a bug in the page, the second is a fact about
+ * the world, and they deserve different words on screen.
+ */
+export class WatchlistError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "WatchlistError";
+  }
 }

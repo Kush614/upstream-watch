@@ -153,7 +153,7 @@ export function App() {
 
         <Watchlist rows={vendors} onCheck={(v) => adapter.checkVendor(v)} />
 
-        <Studio ask={(q) => adapter.ask(q)} sessionKnown={events.length > 0} />
+        <Studio ask={(q) => adapter.ask(q)} sessionKnown={adapter.hasLiveSession()} />
 
         {phase === "awaiting_approval" && detail.approvalId && (
           <NeedsYou

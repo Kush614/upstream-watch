@@ -36,6 +36,8 @@ export interface VendorRow {
   files: string[];
   lastCheck: string | null;
   entriesSeen: number;
+  /** Set when the persisted state exists but could not be read. Never conflated with "never". */
+  stateError?: string;
   /** Filled in only by an actual check. Absent means "not looked at this session". */
   result?: VendorResult;
 }
@@ -60,14 +62,20 @@ export async function rows(root: string): Promise<VendorRow[]> {
     targets.vendors.map(async (v) => {
       let lastCheck: string | null = null;
       let entriesSeen = 0;
+      let stateError: string | undefined;
       try {
         const state = JSON.parse(
           await readFile(join(root, `pipeline/state/${v.vendor}.last.json`), "utf8"),
         ) as { lastCheck?: string; seen?: unknown[] };
         lastCheck = state.lastCheck ?? null;
         entriesSeen = state.seen?.length ?? 0;
-      } catch {
-        // No state file means this vendor has never been checked. That is a real answer.
+      } catch (cause) {
+        // "Never checked" and "the record of the check is unreadable" look identical in a
+        // table and mean opposite things — one is honest coverage, the other is a broken
+        // watchlist wearing an innocent face. Only a missing file is the innocent one.
+        if ((cause as NodeJS.ErrnoException)?.code !== "ENOENT") {
+          stateError = `state file unreadable — ${cause instanceof Error ? cause.message : String(cause)}`;
+        }
       }
 
       return {
@@ -79,6 +87,7 @@ export async function rows(root: string): Promise<VendorRow[]> {
         files: v.files,
         lastCheck,
         entriesSeen,
+        stateError,
       };
     }),
   );

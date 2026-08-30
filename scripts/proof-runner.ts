@@ -45,21 +45,27 @@ let state: State = {};
  * the scrape finds nothing, the columns render without this citation rather than with a
  * sentence we wrote ourselves.
  */
-let changelog: ChangelogCitation | undefined;
-let changelogTried = false;
+let changelogLookup: Promise<ChangelogCitation | undefined> | undefined;
 
 async function changelogCitation(): Promise<ChangelogCitation | undefined> {
-  if (changelogTried) return changelog;
-  changelogTried = true;
-
-  try {
+  // Cache the PROMISE, not a "tried" flag. Both columns run concurrently, and a flag set
+  // before the await let the second run through with undefined while the first was still
+  // scraping — one column cited the vendor and the other silently did not.
+  changelogLookup ??= (async () => {
     const result = await check(ROOT, "openai");
     const hit = result.matches.find((m) => m.title.includes(OLD_MODEL));
-    if (hit) changelog = { date: hit.date, title: hit.title, url: hit.url, body: hit.title };
+    return hit ? { date: hit.date, title: hit.title, url: hit.url, body: hit.title } : undefined;
+  })();
+
+  try {
+    return await changelogLookup;
   } catch (error) {
     await logFailure("changelog citation", error);
+    // Do not cache the failure for the life of the process: a scrape that failed once
+    // because the network blinked should not silence the citation until a restart.
+    changelogLookup = undefined;
+    return undefined;
   }
-  return changelog;
 }
 
 async function loadState(): Promise<void> {

@@ -9,7 +9,7 @@
  * same thing and cannot drift apart.
  */
 
-import type { Adapter, Citation, RunChunk, RunResult, UiEvent, VendorResult, VendorRow } from "./adapter.ts";
+import { WatchlistError, type Adapter, type Citation, type RunChunk, type RunResult, type UiEvent, type VendorResult, type VendorRow } from "./adapter.ts";
 
 const VENDOR = "openai";
 const SHUTDOWN = "2026-07-23";
@@ -305,8 +305,13 @@ export class MockAdapter implements Adapter {
 
   async checkVendor(vendor: string): Promise<VendorResult> {
     const row = VENDORS.find((v) => v.vendor === vendor);
-    if (!row) throw new Error(`${vendor} is not on the watchlist`);
+    if (!row) throw new WatchlistError(`${vendor} is not on the watchlist`);
     return row.result ?? { entries: row.entriesSeen, matches: [], breakingElsewhere: 0, at: new Date().toISOString() };
+  }
+
+  hasLiveSession(): boolean {
+    // The mock is a recording. There is nothing on the other end of the composer.
+    return false;
   }
 
   async ask(question: string): Promise<string> {

@@ -85,8 +85,15 @@ export function Watchlist({
                   </td>
 
                   <td className="py-2.5 pr-3 text-dim">
-                    {row.lastCheck ? new Date(row.lastCheck).toLocaleString() : "never"}
-                    <div className="text-[12px]">{row.entriesSeen} entries seen</div>
+                    {row.stateError ? (
+                      // "never checked" and "the record is unreadable" mean opposite things.
+                      <span className="text-bad">{row.stateError}</span>
+                    ) : (
+                      <>
+                        {row.lastCheck ? new Date(row.lastCheck).toLocaleString() : "never"}
+                        <div className="text-[12px]">{row.entriesSeen} entries seen</div>
+                      </>
+                    )}
                   </td>
 
                   <td className="py-2.5 pr-3">
