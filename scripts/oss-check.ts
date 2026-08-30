@@ -208,7 +208,8 @@ async function main(): Promise<void> {
   const asJson = args.includes("--json");
   // Same opt-out the vendor scraper has, and for the same reason: looking should never
   // change what the next run sees.
-  const persist = !args.includes("--no-persist");
+  // Opt-IN, like oss:proof. Looking should never quietly replace the answer the UI shows.
+  const persist = args.includes("--save");
 
   const packages = (await loadPackages()).filter((p) => !only || p.name === only || p.package === only);
   if (packages.length === 0) throw new ConfigError(`no watched package matches ${only}`, { only });
