@@ -601,3 +601,39 @@ source diff" for express, but the top hits were `History.md`, `README.md` and
 claims to be independent of it — inflating precisely the number this tool exists to compare
 against the announcement. Hits are now split `code` vs `docs`, code first, and a package
 whose only mentions are prose says so.
+
+## 2026-08-30 — Four ways the dependency watcher said "fine" without looking
+
+Qodo found three of these on #16 and the probes surfaced a fourth. Every one produces
+reassurance rather than a visible failure, which is now the recurring shape of every real
+bug in this project.
+
+**GitHub caps a compare at 300 files.** react-dom and eslint both reported *exactly* 300 —
+the tell. Files past the cap were never examined, so "0 changes to anything you call" was
+not a finding, it was the absence of one. `SourceDiff.truncated` now says which it is, and
+the CLI prints the warning next to the count.
+
+**The diff stopped at the next major.** eslint is two majors behind; comparing `8.57.0` to
+`9.0.0` examines none of the 10.x changes and then presents a complete-looking answer. Now
+compares through to latest — express went from 74 files to 105 as a result, meaning 31 files
+of real change had been invisible.
+
+**Release notes stopped at thirty.** A fixed `per_page` answers "were we told about this?"
+with "we did not look far enough". Paginated: eslint's mentions went 7 → 15.
+
+**An unparseable pin read as up to date.** `^4.19.2`, `latest`, a git URL — anything
+`majorOf` could not read fell through to `majorsBehind: 0`, which renders as the *most*
+reassuring answer in the one case where we know the least. It now carries `unparseablePin`
+and the CLI says explicitly that this is not "up to date".
+
+**And one in my own probe.** The eslint probe reported `.eslintrc.json was ignored` for
+ESLint **8**, which would have claimed the old version was already broken and destroyed the
+whole point of the column. The cause: my `.eslintrc.json` set no `parserOptions`, so ESLint
+8 defaulted to ES5 and answered `Parsing error: The keyword 'const' is reserved`. That error
+is ESLint *reading and applying* the config. The probe only looked for the rule name, missed
+it, and inverted the finding. Both outcomes now count as "the config was read"; what proves
+it was not is eslint refusing to run at all.
+
+**`--slurp` cannot be combined with `--jq`** in `gh api`. This one failed loudly and reached
+the UI as `/packages -> 500`, which is the good version of this story: it broke visibly
+instead of returning a short list that looked like a complete one.
